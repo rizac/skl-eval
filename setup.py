@@ -47,7 +47,7 @@ setup(
     author_email='rizac@gfz-potsdam.de',  # FIXME: what to provide?
 
     # Choose your license
-    license='GNU',
+    license='GPL3',
 
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
@@ -78,6 +78,7 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
     ],
 
     # What does your project relate to?
@@ -86,6 +87,8 @@ setup(
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
     packages=find_packages(exclude=['contrib', 'docs', 'tests', 'htmlcov']),
+
+    python_requires='>=3.6.9',
 
     # Alternatively, if you want to distribute just a my_module.py, uncomment
     # this:
@@ -138,6 +141,10 @@ setup(
     # In this case, 'data_file' will be installed into '<sys.prefix>/my_data'
     #
     # data_files=[('my_data', ['data/data_file'])],
+
+    # For info see https://python-packaging.readthedocs.io/en/latest/non-code-files.html
+    # include_package_data=True,
+    # zip_safe=False,
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow
