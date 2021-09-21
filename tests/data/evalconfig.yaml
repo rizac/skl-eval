@@ -1,0 +1,115 @@
+# Configuration for evaluating a scikit-learn models. Remember that
+# during evaluation every Python module and function in this directory will be
+# available and their path can be typed here (see classifier.score_function or
+# evaluation_metrics). Also, all non absolute paths will be relative to this
+# directory
+
+# Features to use, which must be columns of the data frames loaded from any given
+# training and test set.
+# The evaluation will be performed on all features combinations automatically. If you want
+# to avoid this and use a specific combination of your choice, provide a list of lists.
+# So for example:
+# features:
+#   - PGA
+#   - PGV
+# will train 3 classifier for each training set: PGA, then PGV and finally PGA,PGV.
+# This is the same as specify explicitly (note the list of lists):
+# features:
+# -
+#  - PGA
+# -
+#  - PGV
+# -
+#  - PGA
+#  - PGV
+features:
+  - PGA
+  - PGV
+
+# path to the training set file(s) (HDF file). When non absolute, paths will be relative
+# to this config file path. If the HDF has several groups, you can specify the group
+# name ('key' argument of `pandas.read_hdf`) as suffix after a double colon "::"
+trainingset:
+  - trainingset.hdf::segments
+
+# Classifier:
+classifier:
+  # The sklearn classifier, as Python path:
+  classname: "sklearn.ensemble.IsolationForest"
+  # The classifier parameters to iterate over (either hyper-parameters or functions
+  # parameters used in the code of the classifier):
+  parameters:
+    n_estimators:
+      - 25
+      - 50
+      # - 100
+      # - 200
+    max_samples:
+      - 256
+      - 512
+      - 1024
+      # - 2048
+      # - 4096
+      # - 8192
+      # - 16384
+    contamination:
+      - 'auto'
+    random_state:
+      - 11
+      # - 25
+      - 42
+
+# drop / ignore missing/NA values from each computation. Na values are by
+# default NaN and None. Set to true if the classifier can not handle NaNs
+drop_na: true
+
+# Whether to consider +-Inf as NA
+inf_is_na: true
+
+# path to the test set file(s) (HDF files). When non absolute, paths will be relative
+# to this config file path. If the HDF has several groups, you can specify the group
+# name ('key' argument of `pandas.read_hdf`) as suffix after a double colon "::"
+testset:
+  - testset_good.hdf::segments
+  - testset_bad.hdf::segments
+
+
+# the column name denoting the true numeric values or labels (argument `y_true`
+# in most `sklearn.metrics` functions). It must be a column present in all test
+# set dataframes, and will be used in the evaluation metrics to compare its
+# values with those predicted by the classifier (see `prediction_function`)
+ground_truth_column: 'outlier'
+
+
+# the function used by the classifier to classify or predict testset instances.
+# Usually, it is the full path or simply the name of a classifier method (e.g.
+# 'decision_function', 'predict', 'sklearn.ensemble.IsolationForest.predict'),
+# but it can also be the path to any user-defined function with signature
+# `(clf, X)` (`clf` is the classifier object, `X` is the data matrix to be
+# classified or predicted), as long as its output (e.g., classification labels
+# in {-1, 1} or prediction scores in [0, 1]) consistent with the values
+# provided as ground truth in the test set(s) (see `ground_truth_column`)
+prediction_function: 'evalutilities.isf_anomaly_score'
+
+
+# evaluation metrics (YAML sequence of Python function paths). Each function
+# must return either a numeric scalar or a dict of metric names (str) mapped to
+# their numeric value. In the former case, the metric name will be set as the
+# function name.
+# Each function will be called automatically by the evaluation routine with
+# arguments `(y_true, y_pred)` (array of true class labels and array
+# of predicted scores/classes) and optionally, the keyword argument 'sample_weight'
+# if the test-set dataframe has a column named 'sample_weight' (thus, rename the
+# column if such a column exist and it's not intended to be used this way)
+evaluation_metrics:
+  - sklearn.metrics.average_precision_score
+  - sklearn.metrics.mean_absolute_error
+  - sklearn.metrics.median_absolute_error
+  - sklearn.metrics.mean_squared_error
+  - sklearn.metrics.log_loss
+  - evalutilities.best_th_prc
+  - evalutilities.average_precision_score_iforest
+  - evalutilities.mean_absolute_error_iforest
+  - evalutilities.median_absolute_error_iforest
+  - evalutilities.mean_squared_error_iforest
+  - evalutilities.log_loss_iforest
