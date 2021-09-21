@@ -100,7 +100,7 @@ setup(
     # $ pip install -e .[dev,test]
     extras_require={
         # use latest versions. Without boundaries
-        'dev': [
+        'test': [
             'pytest>=6.2.2',
             'pytest-cov>=2.11.1'
         ],
@@ -112,11 +112,14 @@ setup(
 
     # If there are data files included in your packages that need to be
     # installed, specify them here.  If using Python 2.6 or less, then these
-    # have to be included in MANIFEST.in as well.
+    # have to be included in MANIFEST.in as well. The value must be a mapping
+    # from package name to a list of relative path names that should be copied
+    # into the package. The paths are interpreted as relative to the directory
+    # containing the package.
     #
-    # package_data={
-    #    'sample': ['package_data.dat'],
-    # },
+    package_data={
+       'tests': ['data'],
+    },
 
     # Although 'package_data' is the preferred approach, in some case you may
     # need to place data files outside of your packages. See:
