@@ -66,18 +66,7 @@ setup(
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
-        # 'Programming Language :: Python :: 2',
-        # 'Programming Language :: Python :: 2.6',
-        # 'Programming Language :: Python :: 2.7',
-        # 'Programming Language :: Python :: 3',
-        # 'Programming Language :: Python :: 3.2',
-        # 'Programming Language :: Python :: 3.3',
-        # 'Programming Language :: Python :: 3.4',
-        # 'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3',
     ],
 
     # What does your project relate to?
@@ -85,7 +74,7 @@ setup(
 
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
-    packages=find_packages(exclude=['contrib', 'docs', 'tests', 'htmlcov']),
+    packages=find_packages(exclude=['contrib', 'docs', 'htmlcov']),
 
     python_requires='>=3.6.9',
 
@@ -97,11 +86,6 @@ setup(
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    # Note: dependancies are NOT honoured. providing, e.g.:
-    # install_requires=['numpy', 'obspy'],
-    # it apparently downloads numpy, then obspy, THEN INSTALLS both
-    # so that, since obspy requires numpy, it complains that's not installed.
-    # numpy must be therefore installed separately, and we write:
     install_requires=[
         'PyYAML>=5.4.1',
         'pandas>=1.2.3',
@@ -155,4 +139,4 @@ setup(
     },
 )
 
-print(str(find_packages(exclude=['contrib', 'docs', 'tests', 'htmlcov'])))
+# print(str(find_packages(exclude=['contrib', 'docs', 'tests', 'htmlcov'])))
