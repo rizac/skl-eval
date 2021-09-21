@@ -70,11 +70,11 @@ setup(
     ],
 
     # What does your project relate to?
-    keywords='machine learning evalation',
+    keywords='machine learning evaluation',
 
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
-    packages=find_packages(exclude=['contrib', 'docs', 'htmlcov']),
+    packages=find_packages(exclude=['contrib', 'docs', 'tests', 'htmlcov']),
 
     python_requires='>=3.6.9',
 
@@ -116,9 +116,9 @@ setup(
     # from package name to a list of relative path names that should be copied
     # into the package. The paths are interpreted as relative to the directory
     # containing the package
-    package_data={
-       'tests': ['data'],
-    },
+    # package_data={
+    #    'tests': ['data'],
+    # },
 
     # Although 'package_data' is the preferred approach, in some case you may
     # need to place data files outside of your packages. See:
@@ -127,16 +127,19 @@ setup(
     #
     # data_files=[('my_data', ['data/data_file'])],
 
-    # For info see https://python-packaging.readthedocs.io/en/latest/non-code-files.html
-    # include_package_data=True,
-    # zip_safe=False,
+    # If there is a MANIFEST.in, this tells to use it to include data files
+    # (https://python-packaging.readthedocs.io/en/latest/non-code-files.html):
+    include_package_data=True,
+
+    # FIXME: add doc here:
+    zip_safe=False,
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow
     # pip to create the appropriate form of executable for the target platform.
     entry_points={
         'console_scripts': [
-            'skl-eval=skleval.evaluate:run',
+            'skl-eval=skleval.cli:run',
         ],
     },
 )

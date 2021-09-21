@@ -24,6 +24,36 @@ import click
 from skleval.core import classifier, evaluate
 
 
+def load_pyclass(py_path):
+    """Loads a Python class from the specified path. E.g.
+    `load_pyclass('sklearn.ensemble.IsolationForest')`
+
+    :raise:
+        `ModuleNotFoundError` (invalid path: module not found),
+        `AttributeError` (invalid path: object not found in module)
+        `ValueError` (valid path but loaded object is not a Python class)
+    """
+    obj = _load_pyobj(py_path)
+    if not inspect.isclass(obj):
+        raise ValueError('"%s" found but not a Python class' % py_path)
+    return obj
+
+
+def load_pyfunc(py_path):
+    """Loads a Python class from the specified path. E.g.
+    `load_pyclass('sklearn.metrics.log_loss')`
+
+    :raise:
+        `ModuleNotFoundError` (invalid path: module not found),
+        `AttributeError` (invalid path: object not found in module)
+        `ValueError` (valid path but loaded object is not a Python function)
+    """
+    obj = _load_pyobj(py_path)
+    if not inspect.isfunction(obj):
+        raise ValueError('"%s" found but not a Python function' % py_path)
+    return obj
+
+
 def _load_pyobj(py_path):
     """Import and return the given Python object from a path
     e.g.
@@ -43,73 +73,7 @@ def _load_pyobj(py_path):
         except Exception:
             raise exc from None
 
-    try:
-        return getattr(obj, att_name)
-    except AttributeError:
-        raise ValueError('"%s" not found in "%s"' % (att_name, mod_path))
-
-
-def load_pyclass(py_path):
-    obj = _load_pyobj(py_path)
-    if not inspect.isclass(obj):
-        raise ValueError('"%s" found but not a Python class' % py_path)
-    return obj
-
-
-def load_pyfunc(py_path):
-    obj = _load_pyobj(py_path)
-    if not inspect.isfunction(obj):
-        raise ValueError('"%s" found but not a Python function' % py_path)
-    return obj
-
-
-def hdf_nrows(filepath, key=None):
-    """Get the number of rows of the given HDF.
-
-    :param filepath: the HDF file path
-    :param key: the key denoting the table in the HDF. If None, it will default
-    to the only key found. A ValueError is raised if several keys are present
-    and `key` is None, or if if key is not found in the HDF
-    """
-    store = pd.HDFStore(filepath)
-    try:
-        keys = list(store.keys())
-        if key is None:
-            if len(keys) == 1:
-                key = keys[0]
-            else:
-                raise ValueError('Unable to get number of rows: '
-                                 'HDF has more than 1 key')
-        try:
-            return store.get_storer(key).nrows
-        except KeyError:
-            raise ValueError('Key "%s" not found in HDF' % key)
-    finally:
-        store.close()
-
-
-def feat_combinations(features):
-    """Yields the total number of features combination
-
-    :features: iterable of strings denoting the feature names. If string, it
-        will return a list with the feature name as single element.
-    """
-    features = list(features) if not isinstance(features, list) else features
-    for k in range(len(features)):
-        yield from combinations(features, k+1)
-
-
-def feat_combinations_count(features):
-    """Return the integer representing the total number of feature combinations
-    from the given list of features"""
-    n = len(features)
-    return int(math.fsum(num_comb_nk(n, k+1) for k in range(n)))
-
-
-def num_comb_nk(n, k):
-    """Number of combinations of k elements taken from a set of n elements"""
-    f = math.factorial
-    return int(f(n) / f(k) / f(n-k))
+    return getattr(obj, att_name)
 
 
 _SAMPLE_WEIGHT_STR = 'sample_weight'
@@ -392,6 +356,30 @@ def process_features(features):
     return unique_features, features_iterator, features_iterations
 
 
+def feat_combinations(features):
+    """Yields the total number of features combination
+
+    :features: iterable of strings denoting the feature names. If string, it
+        will return a list with the feature name as single element.
+    """
+    features = list(features) if not isinstance(features, list) else features
+    for k in range(len(features)):
+        yield from combinations(features, k+1)
+
+
+def feat_combinations_count(features):
+    """Return the integer representing the total number of feature combinations
+    from the given list of features"""
+    n = len(features)
+    return int(math.fsum(num_comb_nk(n, k+1) for k in range(n)))
+
+
+def num_comb_nk(n, k):
+    """Number of combinations of k elements taken from a set of n elements"""
+    f = math.factorial
+    return int(f(n) / f(k) / f(n-k))
+
+
 def read_hdf(path_or_buf, *args, mandatory_columns=None, **kwargs):
     """Read the HDF from the given file path and return a pandas DataFrame.
     Wrapper around `pandas.read_hdf` with two features added:
@@ -445,6 +433,14 @@ def _evaluate_mp(args):
             prediction_function, prediction_function_name, \
             testsets, features, unique_features, true_class_column, drop_na, \
             inf_is_na, evaluation_metrics = args
+
+        # Features might be a tuple. Dataframes interpret tuples not as multi
+        # selector, but as single "scalar" key. Thus convert to list. Also,
+        # let's convert string to a one element list, for safety
+        if isinstance(features, str):
+            features = [features]
+        elif not isinstance(features, list):
+            features = list(features)
 
         clf = classifier(clf_class, clf_parameters, trainingset, features=features,
                          drop_na=drop_na, inf_is_na=inf_is_na)

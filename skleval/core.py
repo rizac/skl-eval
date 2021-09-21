@@ -33,11 +33,11 @@ def isna(dataframe, features=None, inf_is_na=False):
 def classifier(clf_class, clf_parameters, trainingset, features=None, drop_na=True,
                inf_is_na=True, **fit_kwargs):
     """
-    Return a scikit learn model fitted with the data of `trainingset`.
+    Return a scikit-learn model fitted with the data of `trainingset`.
     See :func:`save_clf` and :func:`load_clf` for serializing the created
     classifier
 
-    :param clf: a class denoting a sklearn classifier (e.g.
+    :param clf_class: a class denoting a sklearn classifier (e.g.
         :class:`sklearn.ensemble.IsolationForest`)
     :param clf_parameters: the parameters of the classifier `__init__` method
     :param trainingset: pandas DataFrame denoting the training set
@@ -76,16 +76,15 @@ def evaluate(clf, testset, y_true, prediction_function,
     the scores of the given test set(s) and returning the given evaluation
     metrics
 
-    :param clf: a pre-trained classifier object (e.g. an instance of
-        :class:`sklearn.ensemble.IsolationForest`)
+    :param clf: a pre-trained classifier object (e.g. a scikit learn classifier
+        fitted with trained data. See method `fit` of most classifiers)
     :param testset: pandas dataframe denoting the test set(s)
         (rows:instances, columns: features)
-    :param features: features to train/fit the classifier with, and to
-        be used to predict test set(s) data. It must be a list of columns of
-        the training and test sets. If None (the default), all columns will be
-        used (except `y_true` and `sample_weight`, if strings. See below).
-        For a single feature, you can input a simple string instead of a
-        1-element list
+    :param features: list[str], str or None. Features that `clf` has been
+        trained with. It must be a list of columns of the test sets. If None
+        (the default), all columns will be used (except `y_true` and
+        `sample_weight`, if strings. See below). If string, it denotes the
+        only column to be used
     :param y_true: string or numeric/boolean array. The true
     `   class/score/probability, one element per test set row. If string, it
         must be a column of the test set
@@ -129,8 +128,11 @@ def evaluate(clf, testset, y_true, prediction_function,
         non_feature_columns.add(sample_weight)
         sample_weight = testset[sample_weight]
 
-    if features is None:
+    if isinstance(features, str):
+        features = [features]
+    elif features is None:
         features = [f for f in testset.columns if f not in non_feature_columns]
+
     y_pred = predict(clf, prediction_function, testset, features, drop_na,
                      inf_is_na=inf_is_na, inplace=False)
 
@@ -145,7 +147,8 @@ def predict(clf, prediction_function, testset, features=None, drop_na=True,
     """
     Predicts the scores/classes/probabilities of test-set data frame.
 
-    :param clf: the classifier object
+    :param clf: a pre-trained classifier object (e.g. a scikit learn classifier
+        fitted with trained data. See method `fit` of most classifiers)
     :param prediction_function: a function of signature `(clf, X)` returning
         the prediction or classification of the instances  of the test set X
         (matrix of N instances X M features). It can be a method of `clf` such
@@ -153,10 +156,11 @@ def predict(clf, prediction_function, testset, features=None, drop_na=True,
         defined function
     :param testset: pandas DataFrame, one instance per row, one
         feature per column
-    :param features: list[str] or str. The column(s) of the dataframe denoting
-        the  features to be used, i.e. the features that `clf` has been trained
-        with. If None (the default) all columns are used. If string (non empty),
-        it will be considered as the name of the only feature to be used
+    :param features: list[str], str or None. Features that `clf` has been
+        trained with. It must be a list of columns of the test sets. If None
+        (the default), all columns will be used (except `y_true` and
+        `sample_weight`, if strings. See below). If string, it denotes the
+        only column to be used
     :param drop_na: boolean. Ignore instances from the test set that have
         any NA/missing value, and assign them NaN as prediction. NA values are
         either NaN or None (and optionally +-Inf, see `inf_is_na`).

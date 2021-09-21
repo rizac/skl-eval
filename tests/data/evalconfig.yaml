@@ -1,19 +1,20 @@
-# Configuration for evaluating a scikit-learn models. Remember that
-# during evaluation every Python module and function in this directory will be
-# available and their path can be typed here (see classifier.score_function or
-# evaluation_metrics). Also, all non absolute paths will be relative to this
-# directory
+# ============================================================================
+# Evaluation configuration file. Edit / rename at your wish and pass its path
+# to the program (option '-c') to produce the desired evaluation result whose
+# structure is described at the bottom of this page
+# ============================================================================
 
-# Features to use, which must be columns of the data frames loaded from any given
+# Features to use, which must be columns of the tables loaded from any given
 # training and test set.
-# The evaluation will be performed on all features combinations automatically. If you want
-# to avoid this and use a specific combination of your choice, provide a list of lists.
-# So for example:
+# When providing a list of names/strings, the evaluation will be performed on
+# all features combinations automatically. So for example:
 # features:
 #   - PGA
 #   - PGV
-# will train 3 classifier for each training set: PGA, then PGV and finally PGA,PGV.
-# This is the same as specify explicitly (note the list of lists):
+# will run evaluations for 3 classifiers: first using PGA alone, then PGV, and
+# finally both PGA and PGV. To avoid this, and use a specific combination of
+# your choice, provide a list of lists. For instance, the same configuration as
+# above can be obtained by typing explicitly (note the list of lists):
 # features:
 # -
 #  - PGA
@@ -26,18 +27,21 @@ features:
   - PGA
   - PGV
 
-# path to the training set file(s) (HDF file). When non absolute, paths will be relative
-# to this config file path. If the HDF has several groups, you can specify the group
-# name ('key' argument of `pandas.read_hdf`) as suffix after a double colon "::"
+# Path to the training set file(s) in HDF table format. Non absolute paths will be
+# relative to this file directory. If the HDF has several tables, arranged under
+# different directory-like structures called groups, you can specify the group
+# name ('key' argument of `pandas.read_hdf`) as suffix after a double colon "::".
+# Each training set table must have instances arranged by row, and all necessary
+# features arranged by column
 trainingset:
   - trainingset.hdf::segments
 
 # Classifier:
 classifier:
-  # The sklearn classifier, as Python path:
+  # The Python path of the sklearn classifier:
   classname: "sklearn.ensemble.IsolationForest"
-  # The classifier parameters to iterate over (either hyper-parameters or functions
-  # parameters used in the code of the classifier):
+  # The classifier parameters to iterate over (you can type any parameters used
+  # to initialize the classifier):
   parameters:
     n_estimators:
       - 25
@@ -59,48 +63,57 @@ classifier:
       # - 25
       - 42
 
-# drop / ignore missing/NA values from each computation. Na values are by
-# default NaN and None. Set to true if the classifier can not handle NaNs
+# Drop / ignore missing values (aka not available, or NA) from each computation.
+# NA values are NaN and None. Set to true if the classifier can not handle NA
 drop_na: true
 
-# Whether to consider +-Inf as NA
+# Whether to consider also +-Inf as NA (ignored if `drop_na` is false)
 inf_is_na: true
 
-# path to the test set file(s) (HDF files). When non absolute, paths will be relative
-# to this config file path. If the HDF has several groups, you can specify the group
-# name ('key' argument of `pandas.read_hdf`) as suffix after a double colon "::"
+# Path to the test set file(s) in HDF table format. Non absolute paths will be
+# relative to this file directory. If the HDF has several tables, arranged under
+# different directory-like structures called groups, you can specify the group
+# name ('key' argument of `pandas.read_hdf`) as suffix after a double colon "::".
+# Each test set table must have instances arranged by row, all necessary
+# features arranged by column, plus an additional column denoting the instances
+# ground truth value (see `ground_truth_column`) and, optionally, a column called
+# "sample_weight" with instances weight (see `evaluation_metrics`)
 testset:
   - testset_good.hdf::segments
   - testset_bad.hdf::segments
 
 
-# the column name denoting the true numeric values or labels (argument `y_true`
+# The column name denoting the true labels or numeric values (argument `y_true`
 # in most `sklearn.metrics` functions). It must be a column present in all test
-# set dataframes, and will be used in the evaluation metrics to compare its
+# set tables, and will be used by the evaluation metrics to compare true
 # values with those predicted by the classifier (see `prediction_function`)
 ground_truth_column: 'outlier'
 
 
-# the function used by the classifier to classify or predict testset instances.
+# The function used by the classifier to classify or predict test set instances.
 # Usually, it is the full path or simply the name of a classifier method (e.g.
 # 'decision_function', 'predict', 'sklearn.ensemble.IsolationForest.predict'),
 # but it can also be the path to any user-defined function with signature
-# `(clf, X)` (`clf` is the classifier object, `X` is the data matrix to be
-# classified or predicted), as long as its output (e.g., classification labels
-# in {-1, 1} or prediction scores in [0, 1]) consistent with the values
-# provided as ground truth in the test set(s) (see `ground_truth_column`)
+# `(clf, X)` where `clf` is the classifier object and `X` is the data matrix
+# to be classified or predicted. In any case, be sure that the output of this
+# function is consistent with the values provided as ground truth in the test
+# set(s) (see `ground_truth_column`). E.g., if ground truth labels are either
+# True or False, a prediction function can return continuous scores in [0, 1],
+# or binary labels in {0, 1}, but not scores in [0, +Inf] or labels in {-1, 1}
 prediction_function: 'evalutilities.isf_anomaly_score'
 
 
-# evaluation metrics (YAML sequence of Python function paths). Each function
-# must return either a numeric scalar or a dict of metric names (str) mapped to
-# their numeric value. In the former case, the metric name will be set as the
-# function name.
-# Each function will be called automatically by the evaluation routine with
-# arguments `(y_true, y_pred)` (array of true class labels and array
-# of predicted scores/classes) and optionally, the keyword argument 'sample_weight'
-# if the test-set dataframe has a column named 'sample_weight' (thus, rename the
-# column if such a column exist and it's not intended to be used this way)
+# Evaluation metrics, as list of Python function paths (for a list of common
+# metrics, see https://scikit-learn.org/stable/modules/model_evaluation.html)
+# For user-defined metrics, each metric function must have signature
+# `(y_true, y_pred, *, sample_weight=None)`, where `y_true` is the array of
+# ground truth values (see `ground_truth_column`), `y_pred` the predicted
+# values or labels (see `prediction_function`), and sample_weight is the array
+# of weights that will be taken from the column named "sample_weight" of each
+# test set to evaluate, if such a column exist (otherwise, ignore weights).
+# Each function can return either a numeric scalar or a dict of metric names
+# (`str`) mapped to their numeric value. In the former case, the metric name
+# will be set as the function name.
 evaluation_metrics:
   - sklearn.metrics.average_precision_score
   - sklearn.metrics.mean_absolute_error
@@ -113,3 +126,54 @@ evaluation_metrics:
   - evalutilities.median_absolute_error_iforest
   - evalutilities.mean_squared_error_iforest
   - evalutilities.log_loss_iforest
+
+
+# =============================================================================
+# The evaluation result file produced by the program by means of this
+# configuration is an HDF file composed by 2 linked HDF tables. In Python,
+# you can open the tables via the `pandas` library:
+# ```
+# import pandas as pd
+# models_dataframe = pd.read_hdf(eval_result_file_path, key="models")
+# evaluations_dataframe = pd.read_hdf(eval_result_file_path, key="evaluations")
+# ```
+#
+# Table "models"
+# --------------
+# Each row denotes a model created with a specific combination of the values
+# input in this config file. Each column denote:
+#
+# | Column        | Type | Description                                        |
+# |---------------|------|----------------------------------------------------|
+# | id            | int  | unique model id                                    |
+# | clf           | str  | the classifier name (see `classifier.classname`)   |
+# | param_[name1] | any  | the model parameters, prefixed with "param_"       |
+# | ...           | ...  |   (see `classifier.parameters`)                    |
+# | param_[nameN] | any  |                                                    |
+# | trainingset   | str  | The training-set path (see `trainingset`)          |
+# | feat_[name1]  | bool | The training-set features used by the model,       |
+# | ...           | ...  |   prefixed with "feat_" (True means: feature used. |
+# | feat_[nameN]  | bool |   See `features`)                                  |
+# | drop_na       | bool | If the classifier algorithm can not handle NA or   |
+# |               |      |   missing values (by default NaN and None)         |
+# | inf_is_na     | bool | Whether +-Inf are considered NA                    |
+#
+# Table "evaluations"
+# -------------------
+# Each row denotes a model evaluation created with a specific combination of
+# the values input in this config file. Each column denote:
+#
+# | Column               | Type | Description                                 |
+# |----------------------|------|---------------------------------------------|
+# | model_id             | int  | The unique model id (see table above)       |
+# | testset              | str  | The test-set path (see `testset`)           |
+# | ground_truth_column  | str  | The testset column denoting the true labels |
+# |                      |      |   (`y_true` in `sklearn.metrics` functions. |
+# |                      |      |     See `ground_truth_column`)              |
+# | prediction_function  | str  | the function or classifier method used for  |
+# |                      |      |   prediction (the 'y_pred` argument of      |
+# |                      |      |   `sklearn.metrics` functions)              |
+# | evalmetric_[name1]   | any  | The evaluation metrics. Metric names        |
+# |                      | ...  |   (prefixed with "evalmetric_") and values  |
+# | ...                  | ...  |   (usually numeric) depend on the functions |
+# | evalmetric_[nameN]   | any  |   provided (see `evaluation_metrics`)       |
