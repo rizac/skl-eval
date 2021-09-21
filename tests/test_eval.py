@@ -13,7 +13,7 @@ from sklearn.ensemble import IsolationForest
 from skleval.evaluation import isna, dropna, feat_combinations, \
     feat_combinations_count, process_parameters, process_features, \
     process_prediction_function, read_hdf
-from skleval.evaluate import run
+from skleval.cli import run
 
 
 def _decision_function(clf, X):
