@@ -1,3 +1,5 @@
+"""Scikit and pandas core utilities that can be used in custom code"""
+
 import numpy as np
 import pandas as pd
 
@@ -40,10 +42,10 @@ def classifier(clf_class, clf_parameters, trainingset, features=None, drop_na=Tr
     :param clf_parameters: the parameters of the classifier `__init__` method
     :param trainingset: pandas DataFrame denoting the training set
         (rows:instances, columns: features)
-    :param features: features to train/fit the classifier with. It must be a
-        list of columns of the training and test sets. If None (the default),
-        all columns will be used. If string, it denotes the only column to be
-        used
+    :param features: list[str] or str. The features to train/fit the classifier
+        with. It must be a list of columns of the training and test sets.
+        If None (the default), all columns will be used. If string, it denotes
+        the only column to be used
     :param drop_na: boolean. Drop instances from the training set that have
         any NA/missing value, before fitting the classifier. NA values are
         either NaN or None (and optionally +-Inf, see `inf_is_na`).
@@ -55,7 +57,11 @@ def classifier(clf_class, clf_parameters, trainingset, features=None, drop_na=Tr
     :return: a fitted classifier object
     """
     clf = clf_class(**clf_parameters)
-    tr_set = trainingset if features is None else trainingset[tolst(features)]
+    tr_set = trainingset
+    if features is not None:
+        if isinstance(features, str):
+            features = [features]
+        tr_set = trainingset[features]
     if drop_na:
         tr_set = dropna(tr_set, inf_is_na=inf_is_na).copy()
     clf.fit(tr_set.values.copy(), **fit_kwargs)
@@ -147,10 +153,10 @@ def predict(clf, prediction_function, testset, features=None, drop_na=True,
         defined function
     :param testset: pandas DataFrame, one instance per row, one
         feature per column
-    :param features: the column(s) of the dataframe denoting the features to
-        be used, i.e. the features that `clf` has been trained with. If None
-        (the default) all columns are used. If string (non empty), it will be
-        considered as the name of the only feature to be used
+    :param features: list[str] or str. The column(s) of the dataframe denoting
+        the  features to be used, i.e. the features that `clf` has been trained
+        with. If None (the default) all columns are used. If string (non empty),
+        it will be considered as the name of the only feature to be used
     :param drop_na: boolean. Ignore instances from the test set that have
         any NA/missing value, and assign them NaN as prediction. NA values are
         either NaN or None (and optionally +-Inf, see `inf_is_na`).
@@ -166,7 +172,8 @@ def predict(clf, prediction_function, testset, features=None, drop_na=True,
 
     :return: None or a numpy array of the predicted anomaly scores
     """
-    features = None if features is None else tolst(features)
+    if isinstance(features, str):
+        features = [features]
     tst_set = testset if features is None else testset[features]
     _scores = None
     if drop_na:

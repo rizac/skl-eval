@@ -1,5 +1,5 @@
 """
-CLI for the evaluation
+Command line interface (CLI) of the evaluation routine
 
 Created on 01 July 2021
 

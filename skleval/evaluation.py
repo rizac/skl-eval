@@ -1,11 +1,9 @@
 """
-Evaluation (classifiers creation and performance estimation) with pandas and sklearn
-A set (training set, test set) is a pandas DataFrame where each row represents
-an instance and each column a feature
+Evaluation routine module
 
 Created on 1 Nov 2019
 
-@author: riccardo
+@author: Riccardo Z <rizac@github.com>
 """
 import collections
 import importlib
@@ -96,7 +94,7 @@ def feat_combinations(features):
     :features: iterable of strings denoting the feature names. If string, it
         will return a list with the feature name as single element.
     """
-    features = tolst(features)
+    features = list(features) if not isinstance(features, list) else features
     for k in range(len(features)):
         yield from combinations(features, k+1)
 
@@ -178,16 +176,17 @@ def run(clf, clf_parameters, trainingset, testset, features, ground_truth_column
 
     # training sets (pandas DataFrames):
     _cols = list(unique_features)
+    _paths = [trainingset] if isinstance(trainingset, str) else trainingset
     trainingsets = {
-        f: read_hdf(f, columns=_cols, mandatory_columns=_cols)
-        for f in tolst(trainingset)
+        f: read_hdf(f, columns=_cols, mandatory_columns=_cols) for f in _paths
     }
     # test sets (pandas DataFrames):
     # (note: if a requested column is missing on the file, `read_hdf` works anyway)
     _cols += [ground_truth_column]
+    _paths = [testset] if isinstance(testset, str) else testset
     testsets = {
         f: read_hdf(f, columns=_cols + [_SAMPLE_WEIGHT_STR], mandatory_columns=_cols)
-        for f in tolst(testset)
+        for f in _paths
     }
 
     # compute total iterations, create a function yielding the product of
@@ -222,7 +221,7 @@ def run(clf, clf_parameters, trainingset, testset, features, ground_truth_column
                      file=sys.stderr, label='Computing') as pbar:
         mapfunc = pool.imap_unordered if pool is not None else \
             lambda function, iterable, *args, **kwargs: map(function, iterable)
-        chunksize = max(1, int(total_iters/100))
+        chunksize = 100 if total_iters > 100 else 1  # max(1, int(total_iters/100))
         try:
             for id_, (model, evaluations, warnings) in \
                     enumerate(mapfunc(_evaluate_mp, iterargs, chunksize=chunksize), 1):
@@ -502,20 +501,6 @@ def _evaluate_mp(args):
         warnings.showwarning = oldwarn
 
 
-def tolst(obj):
-    """Convert obj to a list of elements: if string, return `[obj]`, if
-    list, return `obj`, if iterable, return `list(obj)`.
-    """
-    # IMPORTANT: the returned value must be a list, because it is used also in
-    # pandas DataFrames column selector: in this case, a list is needed
-    # (e.g., a tuple is interpreted as single key)
-    if isinstance(obj, str):
-        return [obj]
-    if hasattr(obj, '__iter__'):
-        return obj if isinstance(obj, list) else list(obj)
-    raise ValueError('Expected iterable or string, found %s' % obj.__class__.__name__)
-
-
 def _kill_pool(pool, err_msg):
     print('ERROR:')
     print(err_msg)
@@ -539,7 +524,7 @@ class WarningContainer(dict if sys.version_info[:2] >= (3, 6) else
     To fix this, an object of this class can be set **in each sub-process**
     as the default `warnings` writing function (this object is callable):
     ```
-    warnings.showwarning = WarningContainer()`
+    warnings.showwarning = WarningContainer()
     ```
     and then be yielded or returned to the main parent process, where it can
     be merged with all other WarningContainer `dict`s to produce a final
@@ -548,8 +533,10 @@ class WarningContainer(dict if sys.version_info[:2] >= (3, 6) else
     the standard output with no redundancies
     """
     def __call__(self, message, category, filename, lineno, file=None, line=None):
-        """This function is called by the warnings module when a warning is issued
-        For info see https://docs.python.org/3/library/warnings.html#warnings.showwarning
+        """
+        This function is called by the warnings module when a warning is
+        issued. For info see
+        https://docs.python.org/3/library/warnings.html#warnings.showwarning
         """
         if str(message) in self:
             return

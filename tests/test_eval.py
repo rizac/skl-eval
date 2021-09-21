@@ -10,7 +10,8 @@ import yaml
 from click.testing import CliRunner
 from sklearn.ensemble import IsolationForest
 
-from skleval.evaluation import isna, dropna, feat_combinations, \
+from skleval.core import isna, dropna
+from skleval.evaluation import feat_combinations, \
     feat_combinations_count, process_parameters, process_features, \
     process_prediction_function, read_hdf
 from skleval.cli import run
