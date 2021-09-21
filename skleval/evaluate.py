@@ -11,7 +11,8 @@ import yaml
 import click
 import pandas as pd
 
-import sdaas_eval.evaluation as evaluation
+
+import skleval.evaluation as evaluation
 
 
 @click.command()

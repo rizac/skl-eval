@@ -10,10 +10,10 @@ import yaml
 from click.testing import CliRunner
 from sklearn.ensemble import IsolationForest
 
-from sdaas_eval.evaluation import isna, dropna, feat_combinations, \
+from skleval.evaluation import isna, dropna, feat_combinations, \
     feat_combinations_count, process_parameters, process_features, \
     process_prediction_function, read_hdf
-from sdaas_eval.evaluate import run
+from skleval.evaluate import run
 
 
 def _decision_function(clf, X):
