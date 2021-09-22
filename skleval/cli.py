@@ -32,7 +32,14 @@ def copy_example_files(outputdir):
     if not os.path.isdir(outputdir):
         print("%s does not exist and could not be created" % outputdir)
         sys.exit(1)
+    # get readme file and extract the last section:
+    with open(os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                           'README.md')) as _:
+        suffix = _.read().rsplit('<!--', 1)[1].split('-->', 1)[1]
+
+    with open(os.path.dirname(os.path.dirname(__file__)))
     files = ['evalconfig', 'evalutilities.py']
+    dir_name
     for
 
 

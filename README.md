@@ -125,8 +125,12 @@ skl-eval -c <config_file> <output_hdf_file>
 
 (this section is available also at the bottom of the configuration file)
 
+<!-- DEVELOPERS NOTE: when modifying the Evaluation output file description,
+it is recommended to modify it here and then copy/paste this section at the
+bottom of data/evalconfig.yaml -->
+
 The evaluation result file produced by the program by means of the
-configuration is an HDF file composed by 2 linked HDF tables. In Python,
+configuration file is an HDF file composed by 2 linked HDF tables. In Python,
 you can open the tables via the `pandas` library:
 
 ```python
@@ -138,21 +142,20 @@ evaluations_dataframe = pd.read_hdf(eval_result_file_path, key="evaluations")
 **Table "models"**
 
 Each row denotes a model created with a specific combination of the values
-input in this config file. Each column denote:
+input in the config file. Each column denote:
 
 | Column        | Type | Description                                        |
 |---------------|------|----------------------------------------------------|
 | id            | int  | unique model id                                    |
-| clf           | str  | the classifier name (see `classifier.classname`)   |
-| param_[name1] | any  | the model parameters, prefixed with "param_"       |
-| ...           | ...  |   (see `classifier.parameters`)                    |
-| param_[nameN] | any  |                                                    |
-| trainingset   | str  | The training-set path (see `trainingset`)          |
-| feat_[name1]  | bool | The training-set features used by the model,       |
-| ...           | ...  |   prefixed with "feat_" (True means: feature used. |
-| feat_[nameN]  | bool |   See `features`)                                  |
-| drop_na       | bool | If the classifier algorithm can not handle NA or   |
-|               |      |   missing values (by default NaN and None)         |
+| clf           | str  | the classifier name                                |
+| param_`name1` | any  | the model parameters, prefixed with "param_"       |
+| ...           | ...  |                                                    |
+| param_`nameN` | any  |                                                    |
+| training_set  | str  | The training-set path         |
+| feat_`name1`  | bool | The training-set features used by the model, prefixed with "feat_" (true means: feature used) |
+| ...           | ...  |                                                    |
+| feat_`nameN`  | bool |                                                    |
+| drop_na       | bool | If the classifier algorithm can not handle missing values (by default NaN and None) |
 | inf_is_na     | bool | Whether +-Inf are considered NA                    |
 
 
@@ -164,17 +167,9 @@ the values input in this config file. Each column denote:
 | Column               | Type | Description                                 |
 |----------------------|------|---------------------------------------------|
 | model_id             | int  | The unique model id (see table above)       |
-| testset              | str  | The test-set path (see `testset`)           |
-| ground_truth_column  | str  | The testset column denoting the true labels |
-|                      |      |   (`y_true` in `sklearn.metrics` functions. |
-|                      |      |     See `ground_truth_column`)              |
-| prediction_function  | str  | the function or classifier method used for  |
-|                      |      |   prediction (the 'y_pred` argument of      |
-|                      |      |   `sklearn.metrics` functions)              |
-| evalmetric_[name1]   | any  | The evaluation metrics. Metric names        |
-|                      | ...  |   (prefixed with "evalmetric_") and values  |
-| ...                  | ...  |   (usually numeric) depend on the functions |
-| evalmetric_[nameN]   | any  |   provided (see `evaluation_metrics`)       |
-
-
-
+| validation_set       | str  | The validation-set path                     |
+| ground_truth_column  | str  | The validation set column denoting the true labels (passed as argument `y_true` in `sklearn.metrics` functions) |
+| prediction_function  | str  | the function or classifier method used for prediction (passed as agument `y_pred`/`y_score` in `sklearn.metrics` functions) |
+| evalmetric_`name1`   | any  | The evaluation metrics, prefixed with "evalmetric_") |
+| ...                  | ...  |                                             |
+| evalmetric_`nameN`   | any  |                                             |

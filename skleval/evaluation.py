@@ -471,7 +471,7 @@ def _evaluate_mp(args):
         model = {
             'clf': clf_name,
             **{'param_%s' % k: v for k, v in clf_parameters.items()},
-            'trainingset': tr_name,
+            'training_set': tr_name,
             **{'feat_%s' % f: f in features for f in unique_features},
             'drop_na': drop_na, 'inf_is_na': inf_is_na
         }
@@ -485,7 +485,7 @@ def _evaluate_mp(args):
                                     sample_weight=sample_weight, features=features,
                                     drop_na=drop_na, inf_is_na=inf_is_na)
             eval_new = {
-                'testset': testset_name,
+                'validation_set': testset_name,
                 'true_class_column': true_class_column,
                 'prediction_function': prediction_function_name,
                 **{'evalmetric_%s' % k: v for k, v in eval.items()}
