@@ -15,6 +15,27 @@ import pandas as pd
 import skleval.evaluation as evaluation
 
 
+@click.argument("outputdir", metavar='[outputdir]')
+def copy_example_files(outputdir):
+    """
+    Create an example file `evalconfig.yaml` with all necessary instructions to
+    configure your own evaluation. Included also are three datasets required
+    in the configuration (one training set and two test sets in HDF format)
+    and a Python module with user-defined prediction function and evaluation
+    metrics, in order to show how to extend the default scikit methods and
+    functions, if needed.
+
+    [outputdir] the output directory (if non existing, it will be created)
+    """
+    if not os.path.isdir(outputdir):
+        os.makedirs(outputdir)
+    if not os.path.isdir(outputdir):
+        print("%s does not exist and could not be created" % outputdir)
+        sys.exit(1)
+    files = ['evalconfig', 'evalutilities.py']
+    for
+
+
 @click.command()
 @click.option('config_path', '-c', '--config',
     help=('configuration YAML file path. All paths therein will be '
