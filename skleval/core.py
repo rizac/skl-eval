@@ -68,7 +68,7 @@ def classifier(clf_class, clf_parameters, trainingset, features=None, drop_na=Tr
     return clf
 
 
-def evaluate(clf, testset, y_true, prediction_function,
+def evaluate(clf, validation_set, y_true, prediction_function,
              evaluation_metrics, features=None,
              sample_weight=None, drop_na=True, inf_is_na=True):
     """
@@ -78,7 +78,7 @@ def evaluate(clf, testset, y_true, prediction_function,
 
     :param clf: a pre-trained classifier object (e.g. a scikit learn classifier
         fitted with trained data. See method `fit` of most classifiers)
-    :param testset: pandas dataframe denoting the test set(s)
+    :param validation_set: pandas dataframe denoting the validation set(s)
         (rows:instances, columns: features)
     :param features: list[str], str or None. Features that `clf` has been
         trained with. It must be a list of columns of the test sets. If None
@@ -123,18 +123,19 @@ def evaluate(clf, testset, y_true, prediction_function,
     non_feature_columns = set()
     if isinstance(y_true, str):
         non_feature_columns.add(y_true)
-        y_true = testset[y_true]
+        y_true = validation_set[y_true]
     if isinstance(sample_weight, str):
         non_feature_columns.add(sample_weight)
-        sample_weight = testset[sample_weight]
+        sample_weight = validation_set[sample_weight]
 
     if isinstance(features, str):
         features = [features]
     elif features is None:
-        features = [f for f in testset.columns if f not in non_feature_columns]
+        features = [f for f in validation_set.columns
+                    if f not in non_feature_columns]
 
-    y_pred = predict(clf, prediction_function, testset, features, drop_na,
-                     inf_is_na=inf_is_na, inplace=False)
+    y_pred = predict(clf, prediction_function, validation_set, features,
+                     drop_na, inf_is_na=inf_is_na, inplace=False)
 
     evaluation = compute_metrics(evaluation_metrics, y_true, y_pred,
                                  sample_weight=sample_weight)
@@ -142,7 +143,7 @@ def evaluate(clf, testset, y_true, prediction_function,
     return y_pred, evaluation
 
 
-def predict(clf, prediction_function, testset, features=None, drop_na=True,
+def predict(clf, prediction_function, validation_set, features=None, drop_na=True,
             inf_is_na=True, inplace=False):
     """
     Predicts the scores/classes/probabilities of test-set data frame.
@@ -154,8 +155,8 @@ def predict(clf, prediction_function, testset, features=None, drop_na=True,
         (matrix of N instances X M features). It can be a method of `clf` such
         as `decision_function` or `predict` (see sklearn docs) or a user
         defined function
-    :param testset: pandas DataFrame, one instance per row, one
-        feature per column
+    :param validation_set: pandas DataFrame. The validation set: one instance
+        per row, one feature per column
     :param features: list[str], str or None. Features that `clf` has been
         trained with. It must be a list of columns of the test sets. If None
         (the default), all columns will be used (except `y_true` and
@@ -178,25 +179,22 @@ def predict(clf, prediction_function, testset, features=None, drop_na=True,
     """
     if isinstance(features, str):
         features = [features]
-    tst_set = testset if features is None else testset[features]
-    _scores = None
-    if drop_na:
-        invalid = isna(tst_set, inf_is_na=inf_is_na)
-        if invalid.any():
-            # if we have some NA value, proceed to compute only others:
-            _scores = np.full(len(tst_set), np.nan)
-            valid = ~invalid
-            _scores[valid] = prediction_function(clf, tst_set[valid].values.copy())
+    vld_set = validation_set if features is None else validation_set[features]
+    invalid = isna(vld_set, inf_is_na=inf_is_na) if drop_na else None
 
-    # is _scores is None, either we do not need to drop na (the classifier
-    # supports NA), or the testset has only finite values. In both cases
-    # we still need to compute _scores, so:
-    if _scores is None:
-        _scores = prediction_function(clf, tst_set.values.copy())
+    if invalid is not None and invalid.any():
+        # if we have some NA value, proceed to compute only others:
+        _scores = np.full(len(vld_set), np.nan)
+        valid = ~invalid
+        _scores[valid] = prediction_function(clf, vld_set[valid].values.copy())
+    else:
+        # either we do not need to drop na (the classifier
+        # supports NA), or the validation set has only finite values:
+        _scores = prediction_function(clf, vld_set.values.copy())
 
     if inplace:
         colname = 'prediction' if inplace is True else str(inplace)
-        testset[colname] = _scores
+        validation_set[colname] = _scores
     else:
         return _scores
 

@@ -79,7 +79,7 @@ def _load_pyobj(py_path):
 _SAMPLE_WEIGHT_STR = 'sample_weight'
 
 
-def run(clf, clf_parameters, trainingset, testset, features, ground_truth_column,
+def run(clf, clf_parameters, trainingset, validationset, features, ground_truth_column,
         drop_na, inf_is_na, prediction_function, evaluation_metrics,
         multi_process=True, verbose=False):
     """
@@ -98,9 +98,9 @@ def run(clf, clf_parameters, trainingset, testset, features, ground_truth_column
         group name will be used as the `key` argument of :func:`pandas.read_hdf`.
         When no group is specified, it is expected that the HDF contains a
         single table so that the group name is not necessary (as per-pandas doc)
-    :param testset: the path to the HDF file of the training set, or a list of
-        paths. See note on `trainingset` for the concept of path (string or
-        list of objects)
+    :param validationset: the path to the HDF file of the validation set, or a
+        list of paths. See note on `trainingset` for the concept of path
+        (string or list of objects)
     :param features: the features, as iterable of strings
     :param ground_truth_column: string, the column with booleans or [0,1] values
         denoting the true class labels in each test set.
@@ -147,15 +147,15 @@ def run(clf, clf_parameters, trainingset, testset, features, ground_truth_column
     # test sets (pandas DataFrames):
     # (note: if a requested column is missing on the file, `read_hdf` works anyway)
     _cols += [ground_truth_column]
-    _paths = [testset] if isinstance(testset, str) else testset
-    testsets = {
+    _paths = [validationset] if isinstance(validationset, str) else validationset
+    validationsets = {
         f: read_hdf(f, columns=_cols + [_SAMPLE_WEIGHT_STR], mandatory_columns=_cols)
         for f in _paths
     }
 
     # compute total iterations, create a function yielding the product of
     # all arguments which define the number of evaluations to be executed
-    total_iters = len(trainingsets) * len(testsets) * feat_iterations * len(parameters)
+    total_iters = len(trainingsets) * len(validationsets) * feat_iterations * len(parameters)
     if verbose:
         print(pd.DataFrame([
             ['Reading configuration file', '', ''],
@@ -163,7 +163,7 @@ def run(clf, clf_parameters, trainingset, testset, features, ground_truth_column
             ['training set(s):', str(len(trainingsets)), '×'],
             ['parameters combination(s):', str(len(parameters)), '×'],
             ['features combination(s):', str(feat_iterations), '×'],
-            ['test set(s):', str(len(testsets)), '='],
+            ['test set(s):', str(len(validationsets)), '='],
             ['----------------------------', '', ''],
             ['Total number of evaluations:', str(total_iters), '']
         ]).to_string(justify='right', index=False, header=False, na_rep=''))
@@ -173,9 +173,9 @@ def run(clf, clf_parameters, trainingset, testset, features, ground_truth_column
     # true_class_column, drop_na, eval_functions = args
     iterargs = product([clf_path], [clf_class], parameters,
                        trainingsets.items(), [prediction_function],
-                       [prediction_function_path], [testsets], feat_iterator,
-                       [unique_features], [ground_truth_column], [drop_na],
-                       [inf_is_na], [evaluation_metrics])
+                       [prediction_function_path], [validationsets],
+                       feat_iterator, [unique_features], [ground_truth_column],
+                       [drop_na], [inf_is_na], [evaluation_metrics])
 
     # Create the pool for multi processing (if enabled) and run the evaluations:
     pool = Pool(processes=int(cpu_count())) if multi_process else None
@@ -429,6 +429,8 @@ def _evaluate_mp(args):
     warnings.showwarning = WarningContainer()
 
     try:
+        # Note below: the variable name 'testsets' is legacy code, they are
+        # actually validation sets
         clf_name, clf_class, clf_parameters, (tr_name, trainingset), \
             prediction_function, prediction_function_name, \
             testsets, features, unique_features, true_class_column, drop_na, \

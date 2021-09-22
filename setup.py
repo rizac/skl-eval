@@ -140,6 +140,7 @@ setup(
     entry_points={
         'console_scripts': [
             'skl-eval=skleval.cli:run',
+            'skl-eval-init=skleval.cli:copy_example_files'
         ],
     },
 )

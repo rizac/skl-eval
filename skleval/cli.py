@@ -3,9 +3,10 @@ Command line interface (CLI) of the evaluation routine
 
 Created on 01 July 2021
 
-@author: Riccardo Z (rizac@github)
+@author: Riccardo Z (rizac@github.com)
 """
 import os
+import shutil
 import sys
 import yaml
 import click
@@ -15,32 +16,28 @@ import pandas as pd
 import skleval.evaluation as evaluation
 
 
+@click.command()
 @click.argument("outputdir", metavar='[outputdir]')
 def copy_example_files(outputdir):
     """
     Create an example file `evalconfig.yaml` with all necessary instructions to
     configure your own evaluation. Included also are three datasets required
-    in the configuration (one training set and two test sets in HDF format)
+    in the configuration (one training set and two validation sets in HDF format)
     and a Python module with user-defined prediction function and evaluation
     metrics, in order to show how to extend the default scikit methods and
     functions, if needed.
 
-    [outputdir] the output directory (if non existing, it will be created)
+    [outputdir] the output directory. NOTE: the directory must not exist
+        and will be created by the program
     """
-    if not os.path.isdir(outputdir):
-        os.makedirs(outputdir)
-    if not os.path.isdir(outputdir):
-        print("%s does not exist and could not be created" % outputdir)
+    try:
+        src = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
+        shutil.copytree(src, outputdir)
+    except Exception as exc:
+        print('Error: %s' % str(exc), file=sys.stderr)
         sys.exit(1)
-    # get readme file and extract the last section:
-    with open(os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                           'README.md')) as _:
-        suffix = _.read().rsplit('<!--', 1)[1].split('-->', 1)[1]
-
-    with open(os.path.dirname(os.path.dirname(__file__)))
-    files = ['evalconfig', 'evalutilities.py']
-    dir_name
-    for
+    print('Files copied to %s' % outputdir)
+    sys.exit(0)
 
 
 @click.command()
@@ -93,8 +90,8 @@ def run(config_path, single_process, no_progress, outputfile):
         clf = cfg['classifier']['classname']
         prediction_function = cfg['prediction_function']
         clf_parameters = cfg['classifier']['parameters']
-        trainingset = cfg['trainingset']
-        testset = cfg['testset']
+        trainingset = cfg['training_set']
+        validationset = cfg['validation_set']
         features = cfg['features']
         ground_truth_column = cfg['ground_truth_column']
         drop_na = cfg['drop_na']
@@ -105,7 +102,7 @@ def run(config_path, single_process, no_progress, outputfile):
             try:
                 for model_df, eval_df, wrngs in \
                         evaluation.run(clf, clf_parameters, trainingset,
-                                       testset, features, ground_truth_column,
+                                       validationset, features, ground_truth_column,
                                        drop_na, inf_is_na, prediction_function,
                                        evalmetric_funcs,
                                        multi_process=not single_process,

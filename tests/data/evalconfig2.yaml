@@ -31,8 +31,8 @@ features:
 # path to the training set file(s) (HDF file). When non absolute, paths will be relative
 # to this config file path. If the HDF has several groups, you can specify the group
 # name ('key' argument of `pandas.read_hdf`) as suffix after a double colon "::"
-trainingset:
-  - trainingset.hdf::segments
+training_set:
+  - trainingset.nona.hdf::segments
 
 # Classifier:
 classifier:
@@ -63,7 +63,7 @@ classifier:
 
 # drop / ignore missing/NA values from each computation. Na values are by
 # default NaN and None. Set to true if the classifier can not handle NaNs
-drop_na: true
+drop_na: false
 
 # Whether to consider +-Inf as NA
 inf_is_na: true
@@ -71,9 +71,9 @@ inf_is_na: true
 # path to the test set file(s) (HDF files). When non absolute, paths will be relative
 # to this config file path. If the HDF has several groups, you can specify the group
 # name ('key' argument of `pandas.read_hdf`) as suffix after a double colon "::"
-testset:
-  - testset_good.hdf::segments
-  - testset_bad.hdf::segments
+validation_set:
+  - testset_good.nona.hdf::segments
+  - testset_bad.nona.hdf::segments
 
 
 # the column name denoting the true numeric values or labels (argument `y_true`

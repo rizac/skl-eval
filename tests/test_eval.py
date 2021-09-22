@@ -1,6 +1,8 @@
 import sys
+import tempfile
 import unittest
 import os
+import shutil
 from itertools import product
 from unittest.mock import patch
 
@@ -14,7 +16,7 @@ from skleval.core import isna, dropna
 from skleval.evaluation import feat_combinations, \
     feat_combinations_count, process_parameters, process_features, \
     process_prediction_function, read_hdf
-from skleval.cli import run
+from skleval.cli import run, copy_example_files
 
 
 def _decision_function(clf, X):
@@ -114,56 +116,78 @@ class Test(unittest.TestCase):
             read_hdf(input_hdf, columns=['PGA', 'PGV', 'outlier', 'bla'],
                      mandatory_columns=['PGA', 'PGV','outlier', 'bla'])
 
-    def test_run(self):
-        testdata_dir = os.path.join(os.path.dirname(__file__), 'data')
-        destfile = os.path.join(testdata_dir, 'eval_results.hdf')
-        for input_filename in ['evalconfig.yaml', 'evalconfig2.yaml']:
-            inputconfig = os.path.join(testdata_dir, input_filename)
-            try:
+    def test_init_and_run(self):
+        """
+        Launch evaluations of both the `data` and the `tests/data` directories.
+        First launch the init command (create an dest directory), then
+        copy all files in it, and launch all evaluations
+        """
+        tempdir = None
+        try:
+            with tempfile.TemporaryDirectory() as tempdir:
+
+                destdir = tempdir
                 runner = CliRunner()
-                result = runner.invoke(run, ['-c', inputconfig, '--single-process',
-                                             destfile])
-                self.assertEqual(result.exit_code, 0)
-                self.assertTrue(os.path.isfile(destfile))
+                result = runner.invoke(copy_example_files, [destdir])
+                assert result.exit_code != 0
 
-                models_df = pd.read_hdf(destfile, key='models')
-                # check models?
-                with open(inputconfig) as stream:
-                    cfg = yaml.safe_load(stream)
-                feat_count = process_features(cfg['features'])[-1]
-                params_count = len(process_parameters(cfg['classifier']['parameters']))
-                trset_count = 1 if isinstance(cfg['trainingset'], str) else len(cfg['trainingset'])
-                total_rows = int(feat_count * params_count * trset_count)
-                self.assertEqual(len(models_df), total_rows)
+                destdir = os.path.join(tempdir, 'data')
+                runner = CliRunner()
+                result = runner.invoke(copy_example_files, [destdir])
+                assert result.exit_code == 0
 
-                # check evaluations:
-                eval_df = pd.read_hdf(destfile, key='evaluations')
-                tsset_count = 1 if isinstance(cfg['testset'], str) else len(cfg['testset'])
-                total_rows = len(models_df) * tsset_count
-                self.assertEqual(len(eval_df), total_rows)
-                for _, dfr in eval_df.groupby('model_id'):
-                    # there are two rows in `dfr`, one relative to a "good" testset,
-                    # where data has the "correct" label, and a "bad" testset, where
-                    # the labels have been switched on purpose:
-                    series_good = dfr.loc[dfr.testset.str.contains('_good')]
-                    self.assertTrue(len(series_good) == 1)
-                    series_good = series_good.iloc[0]
-                    series_bad = dfr.loc[dfr.testset.str.contains('_bad')]
-                    self.assertTrue(len(series_bad) == 1)
-                    series_bad = series_bad.iloc[0]
-                    # evm: the higher, the better, evm_loss: the lower, the better
-                    evm = ['evalmetric_%s' % _ for _ in
-                                ['average_precision_score',
-                                 'pr_curve_best_threshold_f1score']]
-                    evm = [c for c in dfr.columns if c in ['evalmetric_average_precision_score',
-                                                           'evalmetric_pr_curve_best_threshold_f1score']]
-                    evm_loss = [c for c in dfr.columns if '_error' in c or '_loss' in c]
-                    # check evaluation values are consistent in the two testsets
-                    # (good vs bad):
-                    self.assertTrue((series_good[evm] > series_bad[evm]).all())
-                    self.assertTrue((series_good[evm_loss] < series_bad[evm_loss]).all())
+                # merge the data dir with the tests/data dir, and launch
+                # all evaluations:
+                shutil.copytree(os.path.join(os.path.dirname(__file__), 'data'),
+                                destdir, dirs_exist_ok=True)
 
-                # open the file and check
-            finally:
-                if os.path.isfile(destfile):
-                    os.remove(destfile)
+                for input_filename in ['evalconfig.yaml', 'evalconfig2.yaml']:
+                    inputconfig = os.path.join(destdir, input_filename)
+                    destfile = os.path.join(destdir, input_filename + '.hdf')
+                    runner = CliRunner()
+                    result = runner.invoke(run, ['-c', inputconfig, '--single-process',
+                                                 destfile])
+                    self.assertEqual(result.exit_code, 0)
+                    self.assertTrue(os.path.isfile(destfile))
+
+                    models_df = pd.read_hdf(destfile, key='models')
+                    # check models?
+                    with open(inputconfig) as stream:
+                        cfg = yaml.safe_load(stream)
+                    feat_count = process_features(cfg['features'])[-1]
+                    params_count = len(process_parameters(cfg['classifier']['parameters']))
+                    trset_count = 1 if isinstance(cfg['training_set'], str) else len(cfg['training_set'])
+                    total_rows = int(feat_count * params_count * trset_count)
+                    self.assertEqual(len(models_df), total_rows)
+
+                    # check evaluations:
+                    eval_df = pd.read_hdf(destfile, key='evaluations')
+                    tsset_count = 1 if isinstance(cfg['validation_set'], str) else len(cfg['validation_set'])
+                    total_rows = len(models_df) * tsset_count
+                    self.assertEqual(len(eval_df), total_rows)
+                    for _, dfr in eval_df.groupby('model_id'):
+                        # there are two rows in `dfr`, one relative to a "good" testset,
+                        # where data has the "correct" label, and a "bad" testset, where
+                        # the labels have been switched on purpose:
+                        series_good = dfr.loc[dfr.validation_set.str.contains('_good')]
+                        self.assertTrue(len(series_good) == 1)
+                        series_good = series_good.iloc[0]
+                        series_bad = dfr.loc[dfr.validation_set.str.contains('_bad')]
+                        self.assertTrue(len(series_bad) == 1)
+                        series_bad = series_bad.iloc[0]
+                        # evm: the higher, the better, evm_loss: the lower, the better
+                        evm = ['evalmetric_%s' % _ for _ in
+                                    ['average_precision_score',
+                                     'pr_curve_best_threshold_f1score']]
+                        evm = [c for c in dfr.columns if c in ['evalmetric_average_precision_score',
+                                                               'evalmetric_pr_curve_best_threshold_f1score']]
+                        evm_loss = [c for c in dfr.columns if '_error' in c or '_loss' in c]
+                        # check evaluation values are consistent in the two testsets
+                        # (good vs bad):
+                        self.assertTrue((series_good[evm] > series_bad[evm]).all())
+                        self.assertTrue((series_good[evm_loss] < series_bad[evm_loss]).all())
+
+            # open the file and check
+        finally:
+            if tempdir and os.path.isdir(tempdir):
+                shutil.rmtree(tempdir)
