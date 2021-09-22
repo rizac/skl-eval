@@ -1,12 +1,9 @@
 # skl-eval
+
 Program to run iteratively scikit learn evaluations from pre-built
 training and validation set(s): implement your own features, parameters 
 and evaluation metrics in a configuration file, and let the program run 
 iteratively any given combination of them. 
-
-<!--
-user@mymachine:~/mydir$ (PYTHONPATH=. ./.env/bin/python ./sdaas_eval/evaluate.py -c ./sdaas_eval/eval_configs/evalconfig.yaml /home/me/sdaas_eval_data/accelerometers2.eval.hdf)
--->
 
 ```console
 $ skl-eval -c ./path/to/my-config.yaml /path/to/my-evaluation-result.hdf
@@ -21,20 +18,21 @@ $ skl-eval -c ./path/to/my-config.yaml /path/to/my-evaluation-result.hdf
 
 Computing  [oooooooooooooooooooooooooooo........]   80%  04:43:12
 ```
-(extract from the terminal during evaluation)
+<sup>extract from the terminal during evaluation</sup>
+<hr>
 
 This program is particularly useful: 
- 1. In those cases where a separate training set(s) and test set(s) are 
-    available, e.g. when simpler evaluation by partitioning 
-    (e.g. K-fold split) would be insufficient (if this is not the case,
-    consider reading the [scikit evaluation page](https://scikit-learn.org/stable/modules/model_evaluation.html)
-    as your case might be already covered there)
+ 1. In those cases where a separate training and validation set(s) are 
+    available
  2. To avoid the unnecessary burden of running all models in a loop
     within your Python code, and nicely show progressbar and estimated
     time available on the terminal
  3. To save your evaluations in a portable and simple tabular format
     (HDF file) whose structure is described at the bottom of the page
 
+In case of doubt, consider reading first the
+[scikit evaluation page](https://scikit-learn.org/stable/modules/model_evaluation.html)
+to see if your case is already covered there with no further overhead
 
 ## Installation
 
@@ -50,17 +48,15 @@ pip install -e .               # <- install the program
 (-e is optional  and makes this package editable, meaning that any new 
 `git pull` automatically updates the package without re-installation needed)
 
-Note: **The virtual environment must be activated any time you want to use 
-the program** (type `deactivate` on the terminal to de activate it)
+Notes: 
+ - **The virtual environment must be activated any time you want to use 
+   the program** (type `deactivate` on the terminal to de activate it)
 
+ - For developers who want to run tests:
 
-### Test:
-
-If you cloned the repository for developing new features:
-
-```console
-python -m unittest -f
-```
+   ```console
+   python -m unittest -f
+   ```
 
 ## Usage
 
@@ -68,64 +64,70 @@ python -m unittest -f
 
 The datasets can be created as `DataFrame` objects with the `pandas` library
 (installed with the  program) and then saved as HDF via the `DataFrame.to_hdf`
-method
-
-To run the program you need:
+method. To run the program you need:
 
 - One or more training set, with features arranged by column(s), and 
   instances arranged by rows
-- One or more test sets, with the same features as the training set(s) and
-  an additional "ground truth" column (which can be named as you like) 
-  with the real values, e.g. class labels,  numeric scores. 
-  Additionally, a column named 'sample_weight' can be added: if present, 
-  it will be used in the `sample_weight` argument of most [evaluation
+- One or more validation sets, with the same features as the training set(s), 
+  and an additional "ground truth" column with the real values, e.g. class 
+  labels,  numeric scores. The ground truth column can have any name. 
+  Note that if a column named 'sample_weight' is present, it will be used in 
+  the `sample_weight` argument of most [evaluation
   metrics](https://scikit-learn.org/stable/modules/model_evaluation.html)
   
 
-### Configure the evaluation(s)
-Create the example configuration file via the init command:
+### Configure the evaluation
+
+If you don't have one already, create the example configuration file in YAML 
+format:
+
 ```console
 skl-eval-init <output_directory>
 ```
-the file contains all documentation needed and can thus
-be renamed and/or edited to configure your evaluation:
+creates the file `<output_directory>/evalconfig.yaml` which contains all
+documentation needed and can thus be renamed and/or edited to configure your 
+evaluation:
 
 #### Setup dataset paths
 
 By default, in the created config the training set and test set paths
-refer to three example datasets also provided in the output directory.
-The first thing to do then is to replace the paths with the paths of your 
-datasets.
+refer to three example datasets also provided in `<output_directory>`.
+The first thing to do then is to replace those paths with the paths of your 
+datasets
 
 
-### Setup parameters and features
+#### Setup parameters and features
 
-Then, you can configure the classifier type, its parameters,
+You can configure the classifier type, its parameters,
 the features to be used, and the evaluation metrics to compute. 
 The program will then take care of building all combinations of 
 parameters, features and metrics to calculate
 
 
-### (Optional) Configure custom prediction functions and evaluation metrics
+#### (Optional) Configure custom prediction functions and evaluation metrics
  
-By default, scikit learn models implement their decision / prediction
+By default, scikit-learn models implement their decision / prediction
 functions via class methods (e.g. `predict`, `decision_function`), and
 the package offers all necessary [evaluation metrics](https://scikit-learn.org/stable/modules/model_evaluation.html). 
-In both cases, you can just type the names of the functions you want to use
-in the configuration file (e.g. "sklearn.metrics.log_loss").
+The prediction function and evaluation metric(s) are customizable 
+by simply typing their Python path in the configuration file
+(e.g. "sklearn.metrics.log_loss")
 
-However, in some cases you might want to use custom functions and metrics: 
-the created configuration illustrates how to proceed as some paths refer
-to user-defined functions implemented in an associated custom Python, which
-is also copied in the same directory of the config file: because the evaluation 
-config directory is added to the Python path at runtime, any Python module
-implemented therein will be accessible.
+You can also define your own prediction function and evaluation metrics in a
+separate Python module, as long as the module is placed in the same directory 
+of the configuration file, and then simply type their paths
+in the evaluation config.
+
+The example configuration file by default employs user-defined functions
+implemented in a separate Python module. Both files provide all the necessary
+documentation in case of help
 
 
 ### Run the evaluation
 
 Once setup, you can run the evaluation to a dedicated output file in HDF format
 (You can always type `skl-eval --help` for details)
+
 ```console
 skl-eval -c <config_file> <output_hdf_file>
 ```
