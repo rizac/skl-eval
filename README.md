@@ -9,7 +9,7 @@ user@mymachine:~/mydir$ (PYTHONPATH=. ./.env/bin/python ./sdaas_eval/evaluate.py
 -->
 
 ```console
-$ skl-eval -c ./path/to/my-config.yaml /path/to/my-evaluation-result.hdf
+>$ skl-eval -c ./path/to/my-config.yaml /path/to/my-evaluation-result.hdf
    Reading configuration file
    ==========================
              training set(s):       1  ×
@@ -42,10 +42,10 @@ Create a directory where to clone the project, `cd` in it and then
 as usual:
 
 ```console
-$ git clone <repository_url> .
-$ python3 -m venv <env_dir>  # create virtual Python environment
-$ source <env_dir>/bin/activate  # activate it (if not already activated)
-$ pip install -e .  $ install the program
+git clone <repository_url> .
+python3 -m venv <env_dir>  # create virtual Python environment
+source <env_dir>/bin/activate  # activate it (if not already activated)
+pip install -e .  # install the program
 ```
 (-e is optional  and makes this package editable, meaning that any new 
 `git pull` automatically updates the package without re-installation needed)
