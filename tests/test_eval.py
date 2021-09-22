@@ -93,7 +93,7 @@ class Test(unittest.TestCase):
 
     def test_read_hdf(self):
         testdata_dir = os.path.join(os.path.dirname(__file__), 'data')
-        input_hdf = os.path.join(testdata_dir, 'testset_bad.hdf')
+        input_hdf = os.path.join(testdata_dir, 'testset_bad.nona.hdf')
         # test with the key appended as '::'+ key:
         pd.testing.assert_frame_equal(read_hdf(input_hdf),
                                       read_hdf(input_hdf+'::segments'))
