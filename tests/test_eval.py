@@ -3,7 +3,7 @@ import tempfile
 import unittest
 import os
 import shutil
-from itertools import product
+# from itertools import product
 from unittest.mock import patch
 
 import numpy as np
@@ -14,7 +14,7 @@ from sklearn.ensemble import IsolationForest
 
 from skleval.core import isna, dropna
 from skleval.evaluation import feat_combinations, \
-    feat_combinations_count, process_parameters, process_features, \
+    process_parameters, process_features, \
     process_prediction_function, read_hdf
 from skleval.cli import run, copy_example_files
 
