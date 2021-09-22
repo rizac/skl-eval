@@ -37,13 +37,22 @@ This program is particularly useful:
 
 
 ## Installation
-Git clone the repository, create virtual environment, move to the cloned
-directory and then as usual 
+
+Create a directory where to clone the project, `cd` in it and then
+as usual:
+
 ```console
-pip install -e .
+$ git clone <repository_url> .
+$ python3 -m venv <env_dir>  # create virtual Python environment
+$ source <env_dir>/bin/activate  # activate it (if not already activated)
+$ pip install -e .  $ install the program
 ```
 (-e is optional  and makes this package editable, meaning that any new 
 `git pull` automatically updates the package without re-installation needed)
+
+Note: **The virtual environment must be activated any time you want to use 
+the program** (type `deactivate` on the terminal to de activate it)
+
 
 ### Test:
 
