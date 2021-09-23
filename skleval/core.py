@@ -30,8 +30,8 @@ def isna(dataframe, features=None, inf_is_na=False):
         return dataframe.isna().any(axis=1)
 
 
-def classifier(clf_class, clf_parameters, trainingset, features=None, drop_na=True,
-               inf_is_na=True, **fit_kwargs):
+def classifier(clf_class, clf_parameters, training_set, features=None,
+               drop_na=True, inf_is_na=True, **fit_kwargs):
     """
     Return a scikit-learn model fitted with the data of `trainingset`.
     See :func:`save_clf` and :func:`load_clf` for serializing the created
@@ -40,7 +40,7 @@ def classifier(clf_class, clf_parameters, trainingset, features=None, drop_na=Tr
     :param clf_class: a class denoting a sklearn classifier (e.g.
         :class:`sklearn.ensemble.IsolationForest`)
     :param clf_parameters: the parameters of the classifier `__init__` method
-    :param trainingset: pandas DataFrame denoting the training set
+    :param training_set: pandas DataFrame denoting the training set
         (rows:instances, columns: features)
     :param features: list[str] or str. The features to train/fit the classifier
         with. It must be a list of columns of the training and test sets.
@@ -57,13 +57,13 @@ def classifier(clf_class, clf_parameters, trainingset, features=None, drop_na=Tr
     :return: a fitted classifier object
     """
     clf = clf_class(**clf_parameters)
-    tr_set = trainingset
+    tr_set = training_set
     if features is not None:
         if isinstance(features, str):
             features = [features]
-        tr_set = trainingset[features]
+        tr_set = training_set[features]
     if drop_na:
-        tr_set = dropna(tr_set, inf_is_na=inf_is_na).copy()
+        tr_set = dropna(tr_set, inf_is_na=inf_is_na)
     clf.fit(tr_set.values.copy(), **fit_kwargs)
     return clf
 
@@ -93,12 +93,10 @@ def evaluate(clf, validation_set, y_true, prediction_function,
         set X (matrix of N instances X M features). It can be a method of
         `clf` such as `decision_function` or `predict` (see sklearn docs) or
         a user defined function
-    :param evaluation_metrics: Callable, string, or iterable of Callable/strings.
-        Any string must denote a Python path to an evaluation function that will
-        be dynamically loaded. Eventually, all functions must have signature
-        `(y_true, y_pred, sample_weight=None, ...)` and must return either a
-        numeric scalar, or a dict of metric names (string) mapped to their
-        numeric values
+    :param evaluation_metrics: Iterable of functions. All functions must have
+        signature `(y_true, y_pred, sample_weight=None, ...)` and must return
+        either a numeric scalar, or a dict of metric names (string) mapped to
+        their numeric values
     :param sample_weight: string or numeric array, default None. The test set
         column to be used as sample weight in the evaluation metrics
         (`sample_weight` argument). If string, it must be a numeric column
