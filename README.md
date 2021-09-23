@@ -24,11 +24,13 @@ Computing  [oooooooooooooooooooooooooooo........]   80%  04:43:12
 This program is particularly useful: 
  1. In those cases where a separate training and validation set(s) are 
     available
- 2. To avoid the unnecessary burden of running all models in a loop
-    within your Python code, and nicely show progressbar and estimated
+ 2. To avoid the burden of implementing your own code, focusing on the
+    configuration of your parameters and features combinations, and running
+    all of them with a single command while showing progressbar and estimated 
     time available on the terminal
  3. To save your evaluations in a portable and simple tabular format
     (HDF file) whose structure is described at the bottom of the page
+    and can be loaded in your Python code for analysis via `pandas.read_hdf`
 
 In case of doubt, consider reading first the
 [scikit evaluation page](https://scikit-learn.org/stable/modules/model_evaluation.html)
