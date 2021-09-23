@@ -155,7 +155,8 @@ def run(clf, clf_parameters, trainingset, validationset, features, ground_truth_
 
     # compute total iterations, create a function yielding the product of
     # all arguments which define the number of evaluations to be executed
-    total_iters = len(trainingsets) * len(validationsets) * feat_iterations * len(parameters)
+    total_iters = len(trainingsets) * len(validationsets) * feat_iterations * \
+                  len(parameters)
     if verbose:
         print(pd.DataFrame([
             ['Reading configuration file', '', ''],
@@ -194,30 +195,50 @@ def run(clf, clf_parameters, trainingset, validationset, features, ground_truth_
         'prediction_function': pd.CategoricalDtype(categories=[prediction_function_path])
     }
 
+    def _convert_categorical(dfr, categorical_columns_dict):
+        for col, dtype in categorical_columns_dict.items():
+            dfr[col] = dfr[col].astype(dtype, copy=True)
+        return dfr
+
     # Create the pool for multi processing (if enabled) and run the evaluations:
     pool = Pool(processes=int(cpu_count())) if multi_process else None
     progressbar = click.progressbar if verbose else _progressbar_mock
-
+    models, evaluations, warnings = [], [], WarningContainer()
     with progressbar(length=total_iters, fill_char='o', empty_char='.',
                      file=sys.stderr, label='Computing') as pbar:
         mapfunc = pool.imap_unordered if pool is not None else \
             lambda function, iterable, *args, **kwargs: map(function, iterable)
-        chunksize = 100 if total_iters > 100 else 1  # max(1, int(total_iters/100))
+        chunksize = 100 if total_iters > 100 else 10 if total_iters > 10 else 1
         try:
-            for id_, (model, evaluations, warnings) in \
+            for id_, (model, evals, warns) in \
                     enumerate(mapfunc(_evaluate_mp, iterargs, chunksize=chunksize), 1):
-                # model['id'] = id_
-                model_df = pd.DataFrame([model])
-                model_df.insert(0, 'id', id_)  # insert id first
-                for col, dtype in model_categorical_columns.items():
-                    model_df[col] = model_df[col].astype(dtype, copy=True)
-                evaluations_df = pd.DataFrame(evaluations)
-                evaluations_df.insert(0, 'model_id', id_)  # insert model_id first
-                for col, dtype in eval_categorical_columns.items():
-                    evaluations_df[col] = evaluations_df[col].astype(dtype, copy=True)
-                # evaluations_df['model_id'] = id_  # assign on a dataframe, easier
-                yield model_df, evaluations_df, warnings
-                pbar.update(len(evaluations_df))
+                pbar.update(len(evals))
+                warnings.update(warns)
+                models.append({'id': id_, **model})
+                evaluations.extend({'model_id': id_, **e} for e in evals)
+
+                if id_ % chunksize == 0:
+                    models_df = _convert_categorical(pd.DataFrame(models),
+                                                     model_categorical_columns)
+                    evaluations_df = _convert_categorical(pd.DataFrame(evaluations),
+                                                          eval_categorical_columns)
+                    models, evaluations = [], []
+                    yield models_df, evaluations_df
+
+            if models:
+                models_df = _convert_categorical(pd.DataFrame(models),
+                                                 model_categorical_columns)
+                evaluations_df = _convert_categorical(pd.DataFrame(evaluations),
+                                                      eval_categorical_columns)
+                yield models_df, evaluations_df
+
+            if verbose and warnings:
+                print('\nWarnings:')
+                print("=========")
+                print("(duplicated messages will be shown only once)")
+                print("")
+                print("\n".join(warnings.values()))
+
             # close and join the pool, even if for imap is not strictly necessary
             # it might prevent memory leaks (https://stackoverflow.com/q/38271547):
             if pool is not None:

@@ -85,7 +85,6 @@ def run(config_path, single_process, no_progress, outputfile):
     # Add the config dir to the system path (note: path must be absolute, it
     # seem not to work from the terminal otherwise):
     sys.path.append(config_dir_path)
-    warnings = evaluation.WarningContainer()
     try:
         clf = cfg['classifier']['classname']
         prediction_function = cfg['prediction_function']
@@ -97,10 +96,10 @@ def run(config_path, single_process, no_progress, outputfile):
         drop_na = cfg['drop_na']
         inf_is_na = cfg['inf_is_na']
         evalmetric_funcs = cfg['evaluation_metrics']
-        # destfile = cfg['evaluation_destination_file']
+
         with pd.HDFStore(outputfile, 'w') as store:
             try:
-                for model_df, eval_df, wrngs in \
+                for model_df, eval_df in \
                         evaluation.run(clf, clf_parameters, trainingset,
                                        validationset, features, ground_truth_column,
                                        drop_na, inf_is_na, prediction_function,
@@ -109,18 +108,13 @@ def run(config_path, single_process, no_progress, outputfile):
                                        verbose=not no_progress):
                     store.append('models', model_df, format='table')
                     store.append('evaluations', eval_df, format='table')
-                    warnings.update(wrngs)
             finally:
                 store.close()
-        print("\nEvaluation performed, output written to: %s" %
-              os.path.abspath(outputfile))
 
-        if warnings:
-            print('\nWarnings:')
-            print("=========")
-            print("(duplicated messages will be shown only once)")
-            print("")
-            print("\n".join(warnings.values()))
+        final_str = "Evaluation completed, output written to: %s" % \
+            os.path.abspath(outputfile)
+        print("\n" + ('='*len(final_str)))
+        print("\n" + final_str)
 
     except KeyError as kerr:
         print('Key "%s" not found in "%s"' % (str(kerr), config_path),
