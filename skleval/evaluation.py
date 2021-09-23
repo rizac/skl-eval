@@ -183,6 +183,11 @@ def run(clf, clf_parameters, trainingset, validationset, features, ground_truth_
         'training_set': pd.CategoricalDtype(categories=trainingsets.keys()),
         'clf': pd.CategoricalDtype(categories=[clf_path])
     }
+    # clf parameters whose values are all strings can also be categorical:
+    for pname, pvals in clf_parameters.items():
+        if all(isinstance(_, str) for _ in pvals):
+            model_categorical_columns['param_%s' % pname] = \
+                pd.CategoricalDtype(categories=pvals)
     eval_categorical_columns = {
         'validation_set': pd.CategoricalDtype(categories=validationsets.keys()),
         'true_class_column': pd.CategoricalDtype(categories=[ground_truth_column]),
