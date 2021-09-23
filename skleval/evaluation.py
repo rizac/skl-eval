@@ -177,6 +177,18 @@ def run(clf, clf_parameters, trainingset, validationset, features, ground_truth_
                        feat_iterator, [unique_features], [ground_truth_column],
                        [drop_na], [inf_is_na], [evaluation_metrics])
 
+    # String columns can be saved as categorical, saving space. But we need to
+    # create Categorical dtypes once for all to include all categories:
+    model_categorical_columns = {
+        'training_set': pd.CategoricalDtype(categories=trainingsets.keys()),
+        'clf': pd.CategoricalDtype(categories=[clf_path])
+    }
+    eval_categorical_columns = {
+        'validation_set': pd.CategoricalDtype(categories=validationsets.keys()),
+        'true_class_column': pd.CategoricalDtype(categories=[ground_truth_column]),
+        'prediction_function': pd.CategoricalDtype(categories=[prediction_function_path])
+    }
+
     # Create the pool for multi processing (if enabled) and run the evaluations:
     pool = Pool(processes=int(cpu_count())) if multi_process else None
     progressbar = click.progressbar if verbose else _progressbar_mock
@@ -192,8 +204,12 @@ def run(clf, clf_parameters, trainingset, validationset, features, ground_truth_
                 # model['id'] = id_
                 model_df = pd.DataFrame([model])
                 model_df.insert(0, 'id', id_)  # insert id first
+                for col, dtype in model_categorical_columns.items():
+                    model_df[col] = model_df[col].astype(dtype, copy=True)
                 evaluations_df = pd.DataFrame(evaluations)
                 evaluations_df.insert(0, 'model_id', id_)  # insert model_id first
+                for col, dtype in eval_categorical_columns.items():
+                    evaluations_df[col] = evaluations_df[col].astype(dtype, copy=True)
                 # evaluations_df['model_id'] = id_  # assign on a dataframe, easier
                 yield model_df, evaluations_df, warnings
                 pbar.update(len(evaluations_df))
