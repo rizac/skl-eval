@@ -1,6 +1,6 @@
 # skl-eval
 
-Program to run iteratively scikit learn evaluations from pre-built
+Program to run iteratively scikit-learn evaluations from pre-built
 training and validation set(s): implement your own features, parameters 
 and evaluation metrics in a configuration file, and let the program run 
 iteratively any given combination of them. 
@@ -12,29 +12,29 @@ $ skl-eval -c ./path/to/my-config.yaml /path/to/my-evaluation-result.hdf
              training set(s):       1  ×
    parameters combination(s):      27  ×
      features combination(s):    4095  ×
-                 test set(s):       4  =
+           validation set(s):       4  =
  ----------------------------
  Total number of evaluations:  442260
 
 Computing  [oooooooooooooooooooooooooooo........]   80%  04:43:12
 ```
-<sup>extract from the terminal during evaluation</sup>
+<sup>excerpt of the terminal during evaluation</sup>
 <hr>
 
-This program is particularly useful: 
- 1. In those cases where a separate training and validation set(s) are 
-    available
- 2. To avoid the burden of implementing your own code, focusing on the
-    configuration of your parameters and features combinations, and running
-    all of them with a single command while showing progressbar and estimated 
-    time available on the terminal
- 3. To save your evaluations in a portable and simple tabular format
+This program assumes that you are already familiar with the
+[scikit-learn evaluation routines](https://scikit-learn.org/stable/modules/model_evaluation.html),
+and offers an alternative solution in those cases when:
+
+ 1. A standard cross validation is not sufficient and thus
+    separate training and validation set(s) are pre-built and available
+ 2. You want to avoid the burden of implementing your own code, focusing on the
+    configuration of your parameters, letting the program build all features 
+    and parameters combinations with a single command while showing 
+    progress bar and estimated time available on the terminal
+ 3. You want to save your evaluations in a portable and simple tabular format
     (HDF file) whose structure is described at the bottom of the page
     and can be loaded in your Python code for analysis via `pandas.read_hdf`
-
-In case of doubt, consider reading first the
-[scikit evaluation page](https://scikit-learn.org/stable/modules/model_evaluation.html)
-to see if your case is already covered there with no further overhead
+    
 
 ## Installation
 

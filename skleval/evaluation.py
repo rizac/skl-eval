@@ -164,7 +164,7 @@ def run(clf, clf_parameters, trainingset, validationset, features, ground_truth_
             ['training set(s):', str(len(trainingsets)), '×'],
             ['parameters combination(s):', str(len(parameters)), '×'],
             ['features combination(s):', str(feat_iterations), '×'],
-            ['test set(s):', str(len(validationsets)), '='],
+            ['validation set(s):', str(len(validationsets)), '='],
             ['----------------------------', '', ''],
             ['Total number of evaluations:', str(total_iters), '']
         ]).to_string(justify='right', index=False, header=False, na_rep=''))
