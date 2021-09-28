@@ -245,3 +245,21 @@ def compute_metrics(metrics, y_true, y_pred, sample_weight=None, *args, **kwargs
                 val = {metric_func.__name__: val}
             ret.update(val)
     return ret
+
+
+def predict_cv(clf_class, clf_parameters, training_set, features, cv_class,
+               y_true, prediction_function, drop_na=True, inf_is_na=True):
+
+    y_pred = np.full(np.nan, len(training_set))
+
+    for train_indices, test_indices in \
+            cv_class.split(training_set[features].values, y_true):
+        tr_set = training_set.iloc[train_indices, :]
+        clf = classifier(clf_class, clf_parameters, tr_set, features,
+                         drop_na=drop_na, inf_is_na=inf_is_na)
+        validation_set = training_set.iloc[test_indices, :]
+        y_pred[test_indices] = \
+            predict(clf, prediction_function, validation_set, features,
+                    drop_na=drop_na, inf_is_na=inf_is_na, inplace=False)
+
+    return y_pred

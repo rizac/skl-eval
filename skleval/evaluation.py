@@ -21,7 +21,7 @@ import pandas as pd
 # from pandas.core.indexes.range import RangeIndex
 import click
 
-from skleval.core import classifier, evaluate
+from skleval.core import classifier, evaluate, predict_cv
 
 
 def load_pyclass(py_path):
@@ -138,25 +138,16 @@ def run(clf, clf_parameters, trainingset, validationset, features, ground_truth_
     # features:
     unique_features, feat_iterator, feat_iterations = process_features(features)
 
-    # training sets (pandas DataFrames):
-    _cols = list(unique_features)
-    _paths = [trainingset] if isinstance(trainingset, str) else trainingset
-    trainingsets = {
-        f: read_hdf(f, columns=_cols, mandatory_columns=_cols) for f in _paths
-    }
-    # test sets (pandas DataFrames):
-    # (note: if a requested column is missing on the file, `read_hdf` works anyway)
-    _cols += [ground_truth_column]
-    _paths = [validationset] if isinstance(validationset, str) else validationset
-    validationsets = {
-        f: read_hdf(f, columns=_cols + [_SAMPLE_WEIGHT_STR], mandatory_columns=_cols)
-        for f in _paths
-    }
+    # tr and val sets:
+    trainingsets, validationsets = process_input_datasets(trainingset,
+                                                          validationset,
+                                                          unique_features)
 
     # compute total iterations, create a function yielding the product of
     # all arguments which define the number of evaluations to be executed
     total_iters = len(trainingsets) * len(validationsets) * feat_iterations * \
-                  len(parameters)
+        len(parameters)
+
     if verbose:
         print(pd.DataFrame([
             ['Reading configuration file', '', ''],
@@ -164,7 +155,7 @@ def run(clf, clf_parameters, trainingset, validationset, features, ground_truth_
             ['training set(s):', str(len(trainingsets)), '×'],
             ['parameters combination(s):', str(len(parameters)), '×'],
             ['features combination(s):', str(feat_iterations), '×'],
-            ['validation set(s):', str(len(validationsets)), '='],
+            ['validation set(s) / cv(s):', str(len(validationsets)), '='],
             ['----------------------------', '', ''],
             ['Total number of evaluations:', str(total_iters), '']
         ]).to_string(justify='right', index=False, header=False, na_rep=''))
@@ -398,6 +389,58 @@ def process_features(features):
     return unique_features, features_iterator, features_iterations
 
 
+def process_input_datasets(trainingset, validationset, unique_features,
+                           ground_truth_column):
+    has_cv = False
+    has_file = False
+    # test sets (pandas DataFrames):
+    _cols = list(unique_features) + [ground_truth_column]
+    _paths = [validationset] if isinstance(validationset, str) else validationset
+    validationsets = {}
+    for pth in _paths:
+        try:
+            pth_ = pth.strip()
+            # try to load the class first. If the clas is loaded, then exec
+            # safely to initialize an object of that class:
+            cls_ = pth_.rsplit('(', 1)[0]
+            if not cls_.startswith("sklearn.model_selection."):
+                cls_ = "sklearn.model_selection." + pth_
+            cls_ = load_pyclass(cls_)
+            if 'sklearn.model_selection._split.BaseCrossValidator' in \
+                    set(_.__module__ + '.' + _.__name__ for _ in cls_.mro()):
+                if pth_[-1] != ')':
+                    pth_ += '()'
+                localz = {}
+                exec('ret = %s' % pth, locals=localz)
+                validationsets[pth] = localz['ret']
+                has_cv = True
+                continue
+        except Exception:
+            pass
+        try:
+            validationsets[pth] = read_hdf(pth,
+                                           columns=_cols + [_SAMPLE_WEIGHT_STR],
+                                           mandatory_columns=_cols)
+            has_file = True
+        except Exception:
+            raise ValueError('"%s" is neither a validation set pathto a HDf file, '
+                             'nor a scikit cross validator class. Check typos' % pth)
+
+    if not has_file and not has_cv:
+        raise ValueError('No validation set found (provide paths to HDf files or '
+                         'scikit cross validator classes)')
+
+    # training sets (pandas DataFrames):
+    if not has_cv:
+        _cols.pop()  # remove ground truth column
+    _paths = [trainingset] if isinstance(trainingset, str) else trainingset
+    trainingsets = {
+        f: read_hdf(f, columns=_cols, mandatory_columns=_cols) for f in _paths
+    }
+
+    return trainingsets, validationsets
+
+
 def feat_combinations(features):
     """Yields the total number of features combination
 
@@ -539,6 +582,22 @@ def _evaluate_mp(args):
         return model, evaluations, warnings.showwarning
     finally:
         warnings.showwarning = oldwarn
+
+
+def _evaluate_mp_cv(clf_class, clf_parameters, training_set, features,
+                    cv_instance, y_true, prediction_function,
+                    drop_na, inf_is_na):
+    (clf_class, clf_parameters, training_set, features, cv_instance  clf, testset, true_class_column,
+     prediction_function, evaluation_metrics,
+     sample_weight=sample_weight, features=features,
+     drop_na=drop_na, inf_is_na=inf_is_na)
+
+    y-pred = predict_cv(clf_class, clf_parameters, training_set, features,
+                        cv_instance, y_true, prediction_function, drop_na=True,
+                        inf_is_na=True)
+
+    predict(clf, prediction_function, validation_set, features=features,
+            drop_na=drop_na, inf_is_na=inf_is_na, inplace=False
 
 
 def _kill_pool(pool, err_msg):
