@@ -170,6 +170,7 @@ input in the config file. Each column denote:
 | feat_`nameN`  | bool |                                                    |
 | drop_na       | bool | If the classifier algorithm can not handle missing values (by default NaN and None) |
 | inf_is_na     | bool | Whether +-Inf are considered NA                    |
+| sample_weight_column | str  | The training set column denoting the optional sample weights to fit the model (empty: no weights) |
 
 
 **Table "evaluations"**
@@ -180,9 +181,10 @@ the values input in this config file. Each column denote:
 | Column               | Type | Description                                 |
 |----------------------|------|---------------------------------------------|
 | model_id             | int  | The unique model id (see table above)       |
-| validation_set       | str  | The validation-set path                     |
+| validation           | str  | The validation-set path, or, in case of cross validation, the scikit-learn splitter class |
 | ground_truth_column  | str  | The validation set column denoting the true labels (passed as argument `y_true` in `sklearn.metrics` functions) |
-| prediction_function  | str  | the function or classifier method used for prediction (passed as agument `y_pred`/`y_score` in `sklearn.metrics` functions) |
-| evalmetric_`name1`   | any  | The evaluation metrics, prefixed with "evalmetric_") |
+| prediction_function  | str  | The function or classifier method used for prediction (passed as agument `y_pred`/`y_score` in `sklearn.metrics` functions) |
+| sample_weight_column | str  | The validation set column denoting the optional sample weights (empty: no weights) |
+| metric_`name1`       | any  | The evaluation metrics, prefixed with "evalmetric_") |
 | ...                  | ...  |                                             |
-| evalmetric_`nameN`   | any  |                                             |
+| metric_`nameN`       | any  |                                             |

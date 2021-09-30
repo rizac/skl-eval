@@ -12,8 +12,6 @@ import yaml
 import click
 import pandas as pd
 
-import skleval.evaluation as evaluation
-
 
 @click.command()
 @click.argument("outputdir", metavar='[outputdir]')
@@ -76,6 +74,10 @@ def run(config_path, single_process, no_progress, outputfile):
     (the program captures all warnings displaying them once on the standard
     output at the end of the whole process)
     """
+    # For command line functions, importing inside the functions might speed
+    # Fp whe we just import the module avoiding useless import
+    from skleval.evaluation import run
+
     with open(config_path) as stream:
         cfg = yaml.safe_load(stream)
     cwd = os.getcwd()
@@ -85,30 +87,35 @@ def run(config_path, single_process, no_progress, outputfile):
     # seem not to work from the terminal otherwise):
     sys.path.append(config_dir_path)
     try:
-        clf = cfg['classifier']['classname']
-        prediction_function = cfg['prediction_function']
-        clf_parameters = cfg['classifier']['parameters']
-        trainingset = cfg['training_set']
-        validationset = cfg['validation_set']
-        features = cfg['features']
-        ground_truth_column = cfg['ground_truth_column']
-        drop_na = cfg['drop_na']
-        inf_is_na = cfg['inf_is_na']
-        evalmetric_funcs = cfg['evaluation_metrics']
+        model, eval = cfg['model'], cfg['evaluation']
+
+        clf = model['classifier']
+        clf_parameters = model['parameters']
+        trset = model['training_set']
+        trainingset = trset['file_path']
+        fit_sample_weight_column = trset['sample_weight_column']
+        features = trset['features']
+        drop_na = trset['drop_na']
+        inf_is_na = trset['inf_is_na']
+
+        validation_set = eval['validation']
+        ground_truth_column = eval['ground_truth_column']
+        eval_sample_weight_column = eval['sample_weight_column']
+        prediction_function = eval['prediction_function']
+        evalmetric_funcs = eval['evaluation_metrics']
 
         with pd.HDFStore(outputfile, 'w') as store:
-            try:
-                for model_df, eval_df in \
-                        evaluation.run(clf, clf_parameters, trainingset,
-                                       validationset, features, ground_truth_column,
-                                       drop_na, inf_is_na, prediction_function,
-                                       evalmetric_funcs,
-                                       multi_process=not single_process,
-                                       verbose=not no_progress):
-                    store.append('models', model_df, format='table')
-                    store.append('evaluations', eval_df, format='table')
-            finally:
-                store.close()
+            for model_df, eval_df in run(clf, clf_parameters, trainingset,
+                                         validation_set, features,
+                                         ground_truth_column, drop_na,
+                                         inf_is_na,prediction_function,
+                                         evalmetric_funcs,
+                                         fit_sample_weight_column,
+                                         eval_sample_weight_column,
+                                         multi_process=not single_process,
+                                         verbose=not no_progress):
+                store.append('models', model_df, format='table')
+                store.append('evaluations', eval_df, format='table')
 
         final_str = "Evaluation completed, output written to: %s" % \
             os.path.abspath(outputfile)

@@ -1,47 +1,15 @@
 # ============================================================================
-# Evaluation configuration file. Edit / rename at your wish and pass its path
-# to the program (option '-c') to produce the desired evaluation result whose
-# structure is described at the bottom of this page
+# Evaluation configuration file. Edit / rename at your wish and pass its path to
+# the program (option '-c'). The produced evaluation result is an HDF file whose
+# structure mimics this config and it's described at the bottom of this page
 # ============================================================================
 
-# Features to use, which must be columns of the tables loaded from any given
-# training and test set.
-# When providing a list of names/strings, the evaluation will be performed on
-# all features combinations automatically. So for example:
-# features:
-#   - PGA
-#   - PGV
-# will run evaluations for 3 classifiers: first using PGA alone, then PGV, and
-# finally both PGA and PGV. To avoid this, and use a specific combination of
-# your choice, provide a list of lists. For instance, the same configuration as
-# above can be obtained by typing explicitly (note the list of lists):
-# features:
-# -
-#  - PGA
-# -
-#  - PGV
-# -
-#  - PGA
-#  - PGV
-features:
-  - PGA
-  - PGV
 
-# Path to the training set file(s) in HDF table format. Non absolute paths will be
-# relative to this file directory. If the HDF has several tables, arranged under
-# different directory-like structures called groups, you can specify the group
-# name ('key' argument of `pandas.read_hdf`) as suffix after a double colon "::".
-# Each training set table must have instances arranged by row, and all necessary
-# features arranged by column
-training_set:
-  - 'trainingset.hdf'
-
-# Classifier:
-classifier:
-  # The Python path of the sklearn classifier:
-  classname: "sklearn.ensemble.IsolationForest"
-  # The classifier parameters to iterate over (you can type any parameters used
-  # to initialize the classifier):
+# Model: classifier algorithm and parameters + training set
+model:
+  # The Python path of the scikit-learn classifier:
+  classifier: "sklearn.ensemble.IsolationForest"
+  # The model parameters to iterate over (see the classifier `__init__` method):
   parameters:
     n_estimators:
       - 25
@@ -58,60 +26,103 @@ classifier:
       - 25
       - 42
 
-# Drop / ignore missing values (aka not available, or NA) from each computation.
-# NA values are NaN and None. Set to true if the classifier can not handle NA
-drop_na: true
+  # training set:
+  training_set:
+    # Path to the training set file(s) in HDF table format, with instances arranged
+    # by row and features arranged by columns. For info see:
+    # https://pandas.pydata.org/pandas-docs/stable/user_guide/io.html#hdf5-pytables.
+    # Non absolute paths will be relative to this file directory. If the HDF has
+    # several tables, the group identifier can be specified as suffix after a double colon "::", e.g.
+    # "myfile.hdf::table1" (for info see: https://pandas.pydata.org/docs/reference/api/pandas.read_hdf.html)
+    file_path:
+      - 'trainingset.hdf'
 
-# Whether to consider also +-Inf as NA (ignored if `drop_na` is false)
-inf_is_na: true
+    # The training sets column name denoting the sample weights to be used when fitting
+    # the classifier (method `fit`). Empty string, null or nothing: ignore the value
+    sample_weight_column: null
 
-# Path to the test set file(s) in HDF table format. Non absolute paths will be
-# relative to this file directory. If the HDF has several tables, arranged under
-# different directory-like structures called groups, you can specify the group
-# name ('key' argument of `pandas.read_hdf`) as suffix after a double colon "::".
-# Each test set table must have instances arranged by row, all necessary
-# features arranged by column, plus an additional column denoting the instances
-# ground truth value (see `ground_truth_column`) and, optionally, a column called
-# "sample_weight" with instances weight (see `evaluation_metrics`)
-validation_set:
-  - 'validationset_bad.hdf'
-  - 'validationset_good.hdf'
+    # Features to use. I.e. columns of all datasets (training and validation sets).
+    # When providing features as list of strings, the evaluation will be performed
+    # on all combinations automatically. So for example:
+    # features:
+    #   - PGA
+    #   - PGV
+    # will run evaluations for 3 classifiers: first using PGA alone, then PGV, and
+    # finally both PGA and PGV. To avoid this, and use a specific combination of
+    # your choice, provide a list of lists. For instance, the same configuration as
+    # above can be obtained by typing explicitly (note the list of lists):
+    # features:
+    # -
+    #  - PGA
+    # -
+    #  - PGV
+    # -
+    #  - PGA
+    #  - PGV
+    features:
+      - PGA
+      - PGV
 
+    # Drop / ignore missing values (aka not available, or NA) from each computation.
+    # NA values are NaN and None. Set to true if the classifier can not handle NA
+    drop_na: true
 
-# The column name denoting the true labels or numeric values (argument `y_true`
-# in most `sklearn.metrics` functions). It must be a column present in all test
-# set tables, and will be used by the evaluation metrics to compare true
-# values with those predicted by the classifier (see `prediction_function`)
-ground_truth_column: 'outlier'
-
-
-# The function used by the classifier to classify or predict test set instances.
-# Usually, it is the full path or simply the name of a classifier method (e.g.
-# 'decision_function', 'predict', 'sklearn.ensemble.IsolationForest.predict'),
-# but it can also be the path to any user-defined function with signature
-# `(clf, X)` where `clf` is the classifier object and `X` is the data matrix
-# to be classified or predicted. In any case, be sure that the output of this
-# function is consistent with the values provided as ground truth in the test
-# set(s) (see `ground_truth_column`). E.g., if ground truth labels are either
-# True or False, a prediction function can return continuous scores in [0, 1],
-# or binary labels in {0, 1}, but not scores in [0, +Inf] or labels in {-1, 1}
-prediction_function: 'evalutilities.isf_anomaly_score'  # <- see associated Python file
+    # Whether to consider also +-Inf as NA (ignored if `drop_na` is false)
+    inf_is_na: true
 
 
-# Evaluation metrics, as list of Python function paths (for a list of common
-# metrics, see https://scikit-learn.org/stable/modules/model_evaluation.html)
-# For user-defined metrics, each metric function must have signature
-# `(y_true, y_pred, *, sample_weight=None)`, where `y_true` is the array of
-# ground truth values (see `ground_truth_column`), `y_pred` the predicted
-# values or labels (see `prediction_function`), and sample_weight is the array
-# of weights that will be taken from the column named "sample_weight" of each
-# test set to evaluate, if such a column exist (otherwise, ignore weights).
-# Each function can return either a numeric scalar or a dict of metric names
-# (`str`) mapped to their numeric value. In the former case, the metric name
-# will be set as the function name.
-evaluation_metrics:
-  - sklearn.metrics.average_precision_score
-  - evalutilities.best_th_prc  # <- see associated Python file
+# Evaluation: compute evaluation metrics by comparing true values and predictions
+# computed using validation set or cross-validation method
+evaluation:
+
+  # Path to the validation set file(s), or to a scikit-learn splitter class
+  # (https://scikit-learn.org/stable/modules/classes.html#splitter-classes)
+  # that will be used to cross validate the training set(s).
+  # For files, the same rules apply as in the training set `file_path` (see above).
+  # For splitter classes, provide the scikit-learn class name with optional
+  # arguments, e.g.: "StratifiedKFold()", "KFold(n_splits=5)" or the full path,
+  # e.g.: "sklearn.model_selection.KFold(5)". You can also provide both files and
+  # splitter classes if you want, e.g. to perform cross validation and use the
+  # validation files as test set
+  validation:
+    - 'validationset_bad.hdf'
+    - 'validationset_good.hdf'
+
+  # The validation sets column name denoting the true labels or true numeric
+  # values. If any validation is provided as splitter class (see above), this
+  # must be a column of all training sets
+  ground_truth_column: 'outlier'
+
+  # The validation sets column name denoting the sample weights to be used when
+  # evaluating the model (argument `sample_weight` of scikit-learn metrics
+  # functions). Provide the empty string, null or nothing to ignores the value
+  sample_weight_column: null
+
+  # The function used by each trained model to classify or predict new instances.
+  # Usually, it is the full path or simply the name of a classifier method (e.g.
+  # "decision_function", "predict", "sklearn.ensemble.IsolationForest.predict"),
+  # but it can also be the path to any user-defined function with signature
+  # `(clf, X)` where `clf` is the classifier object and `X` is the data matrix
+  # to be classified or predicted. In any case, be sure that the output of this
+  # function is consistent with the values provided in the ground truth column.
+  # E.g., if ground truth labels are either True or False, a prediction function
+  # can return continuous scores in [0, 1], or binary labels in {0, 1}, but not
+  # scores in [0, +Inf] or labels in {-1, 1}
+  prediction_function: 'evalutilities.isf_anomaly_score'  # <- see associated Python file
+
+  # Evaluation metrics, as list of Python function paths. You can type standard
+  # metrics (https://scikit-learn.org/stable/modules/model_evaluation.html) or
+  # user-defined ones with signature `(y_true, y_pred, *, sample_weight=None)`,
+  # where `y_true` is the array of ground truth values (see `ground_truth_column`),
+  # `y_pred` the predicted values or labels (see `prediction_function`), and
+  # sample_weight is the optional array of weights (see `sample_weight_column`).
+  # All functions must return either a numeric scalar or a dict of metric names
+  # (`str`) mapped to their numeric value (in the former case, the function name
+  # will be used as metric name)
+  metrics:
+    - sklearn.metrics.average_precision_score
+    - evalutilities.best_th_prc  # <- see associated Python file
+
 
 # Evaluation output file description
 #
@@ -137,7 +148,7 @@ evaluation_metrics:
 # | param_`name1` | any  | the model parameters, prefixed with "param_"       |
 # | ...           | ...  |                                                    |
 # | param_`nameN` | any  |                                                    |
-# | training_set  | str  | The training-set path         |
+# | training_set  | str  | The training-set path                              |
 # | feat_`name1`  | bool | The training-set features used by the model, prefixed with "feat_" (true means: feature used) |
 # | ...           | ...  |                                                    |
 # | feat_`nameN`  | bool |                                                    |
@@ -153,8 +164,10 @@ evaluation_metrics:
 # | Column               | Type | Description                                 |
 # |----------------------|------|---------------------------------------------|
 # | model_id             | int  | The unique model id (see table above)       |
-# | validation_set       | str  | The validation-set path                     |
+# | test_set             | str  | The test set path                           |
+# | cross_validation     | str  | Cross-valid. class (Python path), if present|
 # | ground_truth_column  | str  | The validation set column denoting the true labels (passed as argument `y_true` in `sklearn.metrics` functions) |
+# | sample_weight_column  | str  | The validation set column denoting the true labels (passed as argument `y_true` in `sklearn.metrics` functions) |
 # | prediction_function  | str  | the function or classifier method used for prediction (passed as agument `y_pred`/`y_score` in `sklearn.metrics` functions) |
 # | evalmetric_`name1`   | any  | The evaluation metrics, prefixed with "evalmetric_") |
 # | ...                  | ...  |                                             |

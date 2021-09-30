@@ -247,19 +247,28 @@ def compute_metrics(metrics, y_true, y_pred, sample_weight=None, *args, **kwargs
     return ret
 
 
-def predict_cv(clf_class, clf_parameters, training_set, features, cv_class,
-               y_true, prediction_function, drop_na=True, inf_is_na=True):
+def evaluate_cv(clf_class, clf_parameters, training_set, cv_obj,
+                y_true, prediction_function, evaluation_metrics,
+                sample_weight_fit=None, sample_weight_eval=None,
+                features=None, drop_na=True, inf_is_na=True):
 
     y_pred = np.full(np.nan, len(training_set))
-
-    for train_indices, test_indices in \
-            cv_class.split(training_set[features].values, y_true):
+    if isinstance(y_true, str):
+        y_true = training_set[y_true]
+    for train_indices, test_indices in cv_obj.split(training_set.values, y_true):
         tr_set = training_set.iloc[train_indices, :]
+        fit_kwargs = {}
+        if sample_weight_fit is not None:
+            fit_kwargs = {'sample_weight': sample_weight_fit}
         clf = classifier(clf_class, clf_parameters, tr_set, features,
-                         drop_na=drop_na, inf_is_na=inf_is_na)
+                         drop_na=drop_na, inf_is_na=inf_is_na,
+                         **fit_kwargs)
         validation_set = training_set.iloc[test_indices, :]
         y_pred[test_indices] = \
             predict(clf, prediction_function, validation_set, features,
                     drop_na=drop_na, inf_is_na=inf_is_na, inplace=False)
 
-    return y_pred
+    evaluation = compute_metrics(evaluation_metrics, y_true, y_pred,
+                                 sample_weight=sample_weight_eval)
+
+    return y_pred, evaluation
