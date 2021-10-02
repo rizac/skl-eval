@@ -102,7 +102,7 @@ def run(config_path, single_process, no_progress, outputfile):
         ground_truth_column = eval['ground_truth_column']
         eval_sample_weight_column = eval['sample_weight_column']
         prediction_function = eval['prediction_function']
-        evalmetric_funcs = eval['evaluation_metrics']
+        evalmetric_funcs = eval['metrics']
 
         with pd.HDFStore(outputfile, 'w') as store:
             for model_df, eval_df in run(clf, clf_parameters, trainingset,

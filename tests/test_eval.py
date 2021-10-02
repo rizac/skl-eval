@@ -136,10 +136,19 @@ class Test(unittest.TestCase):
                 result = runner.invoke(copy_example_files, [destdir])
                 assert result.exit_code == 0
 
+                test_data_dir = os.path.join(os.path.dirname(__file__), 'data')
+                # The data directory and tests/data directory are conceived to
+                # not contain the same file(s). Check it:
+                common_files = set(os.listdir(destdir)) & set(os.listdir(test_data_dir))
+                if common_files:
+                    raise ValueError('Name conflict(s) in the "data" directory and '
+                                     'in the "tests/data" directory: please '
+                                     'rename / move / delete file(s). '
+                                     'File name(s): %s' % common_files)
+
                 # merge the data dir with the tests/data dir, and launch
                 # all evaluations:
-                shutil.copytree(os.path.join(os.path.dirname(__file__), 'data'),
-                                destdir, dirs_exist_ok=True)
+                shutil.copytree(test_data_dir, destdir, dirs_exist_ok=True)
 
                 for input_filename in ['evalconfig.yaml', 'evalconfig2.yaml']:
                     inputconfig = os.path.join(destdir, input_filename)
@@ -154,33 +163,37 @@ class Test(unittest.TestCase):
                     # check models?
                     with open(inputconfig) as stream:
                         cfg = yaml.safe_load(stream)
-                    feat_count = process_features(cfg['features'])[-1]
-                    params_count = len(process_parameters(cfg['classifier']['parameters']))
-                    trset_count = 1 if isinstance(cfg['training_set'], str) else len(cfg['training_set'])
+                    feat_count = process_features(cfg['model']['training_set']['features'])[-1]
+                    params_count = len(process_parameters(cfg['model']['parameters']))
+                    _trset = cfg['model']['training_set']['file_path']
+                    trset_count = 1 if isinstance(_trset, str) else len(_trset)
                     total_rows = int(feat_count * params_count * trset_count)
                     self.assertEqual(len(models_df), total_rows)
 
                     # check evaluations:
                     eval_df = pd.read_hdf(destfile, key='evaluations')
-                    tsset_count = 1 if isinstance(cfg['validation_set'], str) else len(cfg['validation_set'])
+                    _tsset = cfg['evaluation']['validation']
+                    tsset_count = 1 if isinstance(_tsset, str) else len(_tsset)
                     total_rows = len(models_df) * tsset_count
                     self.assertEqual(len(eval_df), total_rows)
                     for _, dfr in eval_df.groupby('model_id'):
+                        validations = dfr.validation_set
                         # there are two rows in `dfr`, one relative to a "good" testset,
                         # where data has the "correct" label, and a "bad" testset, where
                         # the labels have been switched on purpose:
-                        series_good = dfr.loc[dfr.validation_set.str.contains('_good')]
+                        series_good = dfr.loc[validations.str.contains('_good')]
                         self.assertTrue(len(series_good) == 1)
                         series_good = series_good.iloc[0]
-                        series_bad = dfr.loc[dfr.validation_set.str.contains('_bad')]
+                        series_bad = dfr.loc[validations.str.contains('_bad')]
                         self.assertTrue(len(series_bad) == 1)
                         series_bad = series_bad.iloc[0]
                         # evm: the higher, the better, evm_loss: the lower, the better
-                        evm = ['evalmetric_%s' % _ for _ in
+                        prefix = 'metric_'
+                        evm = [(prefix + _) for _ in
                                     ['average_precision_score',
                                      'pr_curve_best_threshold_f1score']]
-                        evm = [c for c in dfr.columns if c in ['evalmetric_average_precision_score',
-                                                               'evalmetric_pr_curve_best_threshold_f1score']]
+                        evm = [c for c in dfr.columns if c in [prefix + 'average_precision_score',
+                                                               prefix + 'pr_curve_best_threshold_f1score']]
                         evm_loss = [c for c in dfr.columns if '_error' in c or '_loss' in c]
                         # check evaluation values are consistent in the two testsets
                         # (good vs bad):

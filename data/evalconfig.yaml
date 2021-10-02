@@ -1,7 +1,7 @@
 # ============================================================================
-# Evaluation configuration file. Edit / rename at your wish and pass its path to
-# the program (option '-c'). The produced evaluation result is an HDF file whose
-# structure mimics this config and it's described at the bottom of this page
+# Evaluation configuration file. Pass its path to the program (option '-c') to
+# produce the desired evaluation in form of a HDF file whose structure (similar
+# to this config structure), is described at the bottom of this page
 # ============================================================================
 
 
@@ -14,7 +14,6 @@ model:
     n_estimators:
       - 25
       - 50
-      - 100
     max_samples:
       - 512
       - 1024
@@ -23,8 +22,6 @@ model:
       - 'auto'
     random_state:
       - 11
-      - 25
-      - 42
 
   # training set:
   training_set:
@@ -32,8 +29,9 @@ model:
     # by row and features arranged by columns. For info see:
     # https://pandas.pydata.org/pandas-docs/stable/user_guide/io.html#hdf5-pytables.
     # Non absolute paths will be relative to this file directory. If the HDF has
-    # several tables, the group identifier can be specified as suffix after a double colon "::", e.g.
-    # "myfile.hdf::table1" (for info see: https://pandas.pydata.org/docs/reference/api/pandas.read_hdf.html)
+    # several tables, the group identifier can be specified as suffix after a double
+    # colon "::", e.g. "myfile.hdf::table1"; for info see:
+    # https://pandas.pydata.org/docs/reference/api/pandas.read_hdf.html
     file_path:
       - 'trainingset.hdf'
 
@@ -71,29 +69,30 @@ model:
     inf_is_na: true
 
 
-# Evaluation: compute evaluation metrics by comparing true values and predictions
-# computed using validation set or cross-validation method
+# Evaluation: assess the model(s) performances by means of several evaluation
+# metrics describing how close are true values and model-predicted values on a
+# separate validation set, or on the same training set and cross validation
 evaluation:
 
   # Path to the validation set file(s), or to a scikit-learn splitter class
   # (https://scikit-learn.org/stable/modules/classes.html#splitter-classes)
-  # that will be used to cross validate the training set(s).
+  # that will be used to cross-validate the training set(s).
   # For files, the same rules apply as in the training set `file_path` (see above).
   # For splitter classes, provide the scikit-learn class name with optional
   # arguments, e.g.: "StratifiedKFold()", "KFold(n_splits=5)" or the full path,
   # e.g.: "sklearn.model_selection.KFold(5)". You can also provide both files and
   # splitter classes if you want, e.g. to perform cross validation and use the
-  # validation files as test set
+  # validation files as test set in a single program run.
   validation:
     - 'validationset_bad.hdf'
     - 'validationset_good.hdf'
 
-  # The validation sets column name denoting the true labels or true numeric
-  # values. If any validation is provided as splitter class (see above), this
-  # must be a column of all training sets
+  # The validation set(s) column name denoting the true labels or true numeric
+  # values. In case of cross-validation (at least one validation-set provided as
+  # splitter class, see above), this must be a column of all training sets
   ground_truth_column: 'outlier'
 
-  # The validation sets column name denoting the sample weights to be used when
+  # The validation set(s) column name denoting the sample weights to be used when
   # evaluating the model (argument `sample_weight` of scikit-learn metrics
   # functions). Provide the empty string, null or nothing to ignores the value
   sample_weight_column: null

@@ -12,9 +12,10 @@ import math
 import sys
 import warnings
 from contextlib import contextmanager
+from math import isnan
 
 from multiprocessing import Pool, cpu_count
-from itertools import product, combinations
+from itertools import product, combinations, chain
 
 # import numpy as np
 import pandas as pd
@@ -137,25 +138,25 @@ def run(clf, clf_parameters, trainingset, validationset, features, ground_truth_
     unique_features, feat_iterator, feat_iterations = process_features(features)
 
     # tr and val sets:
-    trainingsets, validationsets = process_input_datasets(trainingset,
-                                                          validationset,
-                                                          unique_features,
-                                                          fit_sample_weight_column,
-                                                          eval_sample_weight_column)
+    training_sets, validation_sets, cv_splitters = \
+        process_input_datasets(trainingset, validationset, unique_features,
+                               ground_truth_column, fit_sample_weight_column,
+                               eval_sample_weight_column)
 
     # compute total iterations, create a function yielding the product of
     # all arguments which define the number of evaluations to be executed
-    total_iters = len(trainingsets) * len(validationsets) * feat_iterations * \
+    _all_validations = len(validation_sets) + len(cv_splitters)
+    total_iters = len(training_sets) * _all_validations * feat_iterations * \
         len(parameters)
 
     if verbose:
         print(pd.DataFrame([
             ['Reading configuration file', '', ''],
             ['==========================', '', ''],
-            ['training set(s):', str(len(trainingsets)), '×'],
+            ['training set(s):', str(len(training_sets)), '×'],
             ['parameters combination(s):', str(len(parameters)), '×'],
             ['features combination(s):', str(feat_iterations), '×'],
-            ['validation set(s) / cv(s):', str(len(validationsets)), '='],
+            ['validation set(s) / cv splitter(s):', str(_all_validations), '='],
             ['----------------------------', '', ''],
             ['Total number of evaluations:', str(total_iters), '']
         ]).to_string(justify='right', index=False, header=False, na_rep=''))
@@ -164,52 +165,51 @@ def run(clf, clf_parameters, trainingset, validationset, features, ground_truth_
     fit_sample_weight_column = fit_sample_weight_column or ''
     eval_sample_weight_column = eval_sample_weight_column or ''
 
-    # clf_class, clf_parameters, trainingset, testsets, features, \
-    # true_class_column, drop_na, eval_functions = args
-    iterargs = product([clf_path], [clf_class], parameters,
-                       trainingsets.items(), [prediction_function],
-                       [prediction_function_path], [validationsets],
-                       feat_iterator, [unique_features], [ground_truth_column],
-                       [drop_na], [inf_is_na], [evaluation_metrics],
-                       [fit_sample_weight_column], [eval_sample_weight_column])
+    # Columns with a predefined finite sets of values can be set as
+    # categorical data type, saving space. Let's create the Categorical dtypes
+    # once for all now, and then cast each yielded dataframe.
+    # PLEASE NOTE: None and NaN are not allowed in the categories, because it
+    # is reserved for missing values (e.g.: categories=[1,2], dataframe has a
+    # value=3 => the value will be None/NaN)
 
-    # String columns can be saved as categorical, saving space. But we need to
-    # create Categorical dtypes once for all to include all categories:
+    # First start with the classifier parameters
     model_categorical_columns = {
-        'training_set': pd.CategoricalDtype(categories=trainingsets.keys()),
-        'clf': pd.CategoricalDtype(categories=[clf_path]),
-        'sample_weight': pd.CategoricalDtype(categories=[fit_sample_weight_column])
-    }
-    # clf parameters whose values are all strings can also be categorical:
-    for pname, pvals in clf_parameters.items():
-        if all(isinstance(_, str) for _ in pvals):
-            model_categorical_columns['param_%s' % pname] = \
-                pd.CategoricalDtype(categories=pvals)
-    eval_categorical_columns = {
-        'validation_set': pd.CategoricalDtype(categories=validationsets.keys()),
-        'true_class_column': pd.CategoricalDtype(categories=[ground_truth_column]),
-        'prediction_function': pd.CategoricalDtype(categories=[prediction_function_path]),
-        'sample_weight': pd.CategoricalDtype(categories=[eval_sample_weight_column]),
+        'training_set': categorical_dtype(training_sets.keys()),
+        'clf': categorical_dtype([clf_path]),
+        'sample_weight_column': categorical_dtype([fit_sample_weight_column]),
+        **{'param_' + p: categorical_dtype(v) for p, v in clf_parameters.items()}
     }
 
-    def _make_df(list_of_dicts, categorical_columns_dict):
-        dfr = pd.DataFrame(list_of_dicts)
-        for col, dtyp in categorical_columns_dict.items():
-            dfr[col] = dfr[col].astype(dtyp, copy=True)
-        return dfr
+    eval_categorical_columns = {
+        'validation_set': categorical_dtype(
+            chain(validation_sets.keys(), training_sets.keys() if cv_splitters else [])
+        ),
+        'cv_splitter': categorical_dtype(cv_splitters.keys()),
+        'ground_truth_column': categorical_dtype([ground_truth_column]),
+        'prediction_function': categorical_dtype([prediction_function_path]),
+        'sample_weight_column': categorical_dtype([eval_sample_weight_column]),
+    }
 
     # Create the pool for multi processing (if enabled) and run the evaluations:
     pool = Pool(processes=int(cpu_count())) if multi_process else None
-    progressbar = click.progressbar if verbose else _progressbar_mock
+    # map function:
+    _map = pool.imap_unordered if pool is not None else \
+        lambda function, iterable, **kwargs: map(function, iterable)
+    # map arguments:
+    _args = product([clf_path], [clf_class], parameters, training_sets.items(),
+                    [prediction_function], [prediction_function_path],
+                    [validation_sets], [cv_splitters], feat_iterator, [unique_features],
+                    [ground_truth_column], [drop_na], [inf_is_na],
+                    [evaluation_metrics], [fit_sample_weight_column],
+                    [eval_sample_weight_column])
     models, evaluations, warnings = [], [], WarningContainer()
+    progressbar = click.progressbar if verbose else _progressbar_mock
     with progressbar(length=total_iters, fill_char='o', empty_char='.',
                      file=sys.stderr, label='Computing') as pbar:
-        mapfunc = pool.imap_unordered if pool is not None else \
-            lambda function, iterable, *args, **kwargs: map(function, iterable)
         chunksize = 100 if total_iters > 100 else 10 if total_iters > 10 else 1
         try:
             for id_, (model, evals, warns) in \
-                    enumerate(mapfunc(_evaluate_mp, iterargs, chunksize=chunksize), 1):
+                    enumerate(_map(_evaluate_mp, _args, chunksize=chunksize), 1):
                 pbar.update(len(evals))
                 warnings.update(warns)
                 models.append({'id': id_, **model})
@@ -392,58 +392,52 @@ def process_features(features):
     return unique_features, features_iterator, features_iterations
 
 
-def process_input_datasets(trainingset, validationset, unique_features,
-                           ground_truth_column, tr_sample_weight_column,
-                           ts_sample_weight_column):
-    has_cv = False
-    has_file = False
+def process_input_datasets(training_set, validation_set, unique_features,
+                           ground_truth_column,
+                           tr_sample_weight_column=None,
+                           ts_sample_weight_column=None):
     # test sets (pandas DataFrames):
     _cols = list(unique_features) + [ground_truth_column] + \
         ([ts_sample_weight_column] if ts_sample_weight_column else [])
-    _paths = [validationset] if isinstance(validationset, str) else validationset
-    validationsets = {}
+    _paths = [validation_set] if isinstance(validation_set, str) else validation_set
+    v_sets, cv_splitters = {}, {}
     for pth in _paths:
         try:
-            pth_ = pth.strip()
-            # try to load the class first. If the clas is loaded, then exec
-            # safely to initialize an object of that class:
-            cls_ = pth_.rsplit('(', 1)[0]
-            if not cls_.startswith("sklearn.model_selection."):
-                cls_ = "sklearn.model_selection." + pth_
-            cls_ = load_pyclass(cls_)
-            if 'sklearn.model_selection._split.BaseCrossValidator' in \
-                    set(_.__module__ + '.' + _.__name__ for _ in cls_.mro()):
-                if pth_[-1] != ')':
+            v_sets[pth] = read_hdf(pth, mandatory_columns=_cols)
+        except Exception:
+            try:
+                mod_sel_module = _load_pyobj("sklearn.model_selection")
+                pth_ = pth.strip()
+                mod_prefix = mod_sel_module.__name__ + '.'
+                if pth_.startswith(mod_prefix):
+                    pth_ = pth_[len(mod_prefix):]
+                if pth_[-1:] != ')':
                     pth_ += '()'
-                localz = {}
-                exec('ret = %s' % pth, locals=localz)
-                validationsets[pth] = localz['ret'], False  # <- boolean "is_file"
-                has_cv = True
-                continue
-        except Exception:
-            pass
-        try:
-            validationsets[pth] = read_hdf(pth,
-                                           columns=_cols,
-                                           mandatory_columns=_cols), True
-            has_file = True
-        except Exception:
-            raise ValueError('"%s" is neither a validation set pathto a HDf file, '
-                             'nor a scikit cross validator class. Check typos' % pth)
+                assert hasattr(mod_sel_module, pth_.rsplit('(', 1)[0])
+                localz = {'_': mod_sel_module}
+                exec('ret = _.%s' % pth_, localz)
+                cv_splitter = localz['ret']
+                assert 'BaseCrossValidator' in [_.__name__ for _ in cv_splitter.__class__.mro()]
+                assert hasattr(cv_splitter, 'split') and callable(cv_splitter.split)
+                cv_splitters[pth] = cv_splitter  # <- boolean "is_cv"
+            except Exception:
+                raise ValueError('"%s" is nor a valid path to a HDf file '
+                                 '(validation set), neither a scikit-learn '
+                                 'splitter (cross validation). '
+                                 'Check typos' % pth)
 
-    if not has_file and not has_cv:
+    if not v_sets and not cv_splitters:
         raise ValueError('No validation set found (provide paths to HDf files or '
                          'scikit cross validator classes)')
 
     # training sets (pandas DataFrames):
-    _cols = list(unique_features) + ([ground_truth_column] if has_cv else []) + \
+    _cols = list(unique_features) + \
+        ([ground_truth_column] if cv_splitters else []) + \
         ([tr_sample_weight_column] if tr_sample_weight_column else [])
-    _paths = [trainingset] if isinstance(trainingset, str) else trainingset
-    trainingsets = {
-        f: read_hdf(f, columns=_cols, mandatory_columns=_cols) for f in _paths
-    }
+    _paths = [training_set] if isinstance(training_set, str) else training_set
+    tr_sets = {f: read_hdf(f, mandatory_columns=_cols) for f in _paths}
 
-    return trainingsets, validationsets
+    return tr_sets, v_sets, cv_splitters
 
 
 def feat_combinations(features):
@@ -470,38 +464,82 @@ def num_comb_nk(n, k):
     return int(f(n) / f(k) / f(n-k))
 
 
-def read_hdf(path_or_buf, *args, mandatory_columns=None, **kwargs):
+def read_hdf(path_or_buf, *, key=None, columns=None, mandatory_columns=None,
+             **kwargs):
     """Read the HDF from the given file path and return a pandas DataFrame.
     Wrapper around `pandas.read_hdf` with two features added:
-    1. The `key` argument (HDF group to read) can be specified as suffix after
-       a double colon "::" in `path_or_buf`, when the latter is a `str` (path
-       to file). E.g.: read_hdf('/path/to/file.hdf::data', *args, **kwargs)`
-    2. An additional keyword argument `mandatory_columns` checks that the
-       given column(s) exist on the dataframe. Use this in conjunction with the
-       `columns` argument, which loads only specific columns but does not check
-       nor raises if any column is not found on the file
-    In both cases, a ValueError is raised
+    1. When `path_or_buf` is a path to file (`str`), The `key` argument (HDF
+       group to read) can be specified as suffix after a double colon "::".
+       E.g.: read_hdf('/myfile.hdf::table1', ...)`. If both the semicolon and
+       the `key` arguments are specified, a `ValueError` is raised
+    2. An additional keyword argument `mandatory_columns` is like the `columns`
+       argument, but it requires also that the given columns exist. The function
+       first builds the list of all columns (either mandatory or not), and then
+       if `mandatory_columns` is given, raises `ValueError` if any given column
+       is not in the loaded DataFrame
     """
-    if isinstance(path_or_buf, str):
-        idx = path_or_buf.rfind('::')
-        if idx > -1:
-            key = path_or_buf[idx+2:]
-            path_or_buf = path_or_buf[:idx]
-            if len(args) or 'key' in kwargs:
-                raise ValueError('Can not read HDF: key "%s" specified in the path '
-                                 'with double colon but also given as argument')
-            kwargs['key'] = key
-    ret = pd.read_hdf(path_or_buf, *args, **kwargs)
-    if mandatory_columns is not None:
-        missing_columns = set(mandatory_columns) - set(ret.columns)
-        if missing_columns:
-            # format error and raise:
-            err_msg = "Missing column(s) in HDF table: "
-            err_msg += ', '.join('"%s"' % _ for _ in missing_columns)
-            if isinstance(path_or_buf, str):
-                err_msg +=  '(file: %s)' % path_or_buf
-            raise ValueError(err_msg)
+    if isinstance(path_or_buf, str) and '::' in path_or_buf:
+        if key is not None:
+            raise ValueError('Can not read HDF: key "%s" specified in the path '
+                             'with double colon but also given as argument')
+        path_or_buf, key = path_or_buf.rsplit('::', 1)
+
+    # merge columns and mandatory_columns, and read HDF:
+    columns = list(columns or [])
+    columns += [_ for _ in list(mandatory_columns or []) if _ not in columns]
+    ret = pd.read_hdf(path_or_buf, key=key, columns=columns or None, **kwargs)
+    # if mandatory_columns is given, check it:
+    missing_columns = set(mandatory_columns or []) - set(ret.columns)
+    if missing_columns:
+        # format error and raise:
+        err_msg = "Missing column(s) in HDF table: "
+        err_msg += ', '.join('"%s"' % _ for _ in missing_columns)
+        if isinstance(path_or_buf, str):
+            err_msg += '(file: %s)' % path_or_buf
+        raise ValueError(err_msg)
     return ret
+
+
+def categorical_dtype(categories):
+    """Create and return a pandas CategoricalDType from the given categories
+
+    :param categories: iterable of Python objects. Anything
+        for which `pandas.isna` returns True (e.g. NaN, None) will be skipped,
+        as those values are reserved for values not in the categories:
+        ```
+        cat = categorical_dtype(['a', 1, None])  # <- None will be ignored
+        pd.Series(data=['a', 1, 'this will be NaN'], dtype=cat)
+        0      a
+        1      1
+        2    NaN
+        dtype: category
+        Categories (2, object): ['a', 1]
+        ```
+    """
+    unique_categs, categs = set(), []
+    for cat in categories:
+        if cat in unique_categs or pd.isna(cat):
+            # these 2 cases raise, so avoid
+            continue
+        unique_categs.add(cat)
+        categs.append(cat)
+    return pd.CategoricalDtype(categories=categs)  # (categories=[] is ok)
+
+
+def _make_df(list_of_dicts, categorical_columns_dict):
+    """Creats a dataframe from the given list of dicts
+
+    :param categorical_columns_dict: a dict[str, pd.CategoricalDType] denoting
+        columns whose type will be converted to categorical: if any column
+        of the dataframe has string data spanning a finite set of possible
+        values known a priori, you can initialize a pandas
+        CategoricalDType`s with those values and pass it here. Categorical
+        data type are much moire efficient in terms of memory usage
+    """
+    dfr = pd.DataFrame(list_of_dicts)
+    for col, dtyp in categorical_columns_dict.items():
+        dfr[col] = dfr[col].astype(dtyp, copy=True)
+    return dfr
 
 
 @contextmanager
@@ -523,7 +561,7 @@ def _evaluate_mp(args):
         # actually validation sets
         clf_name, clf_class, clf_parameters, (tr_name, trainingset), \
             prediction_function, prediction_function_name, \
-            val_sets, features, unique_features, true_class_col, drop_na, \
+            val_sets, cv_splitters, features, unique_features, true_class_col, drop_na, \
             inf_is_na, evaluation_metrics, fit_sample_weight_col, \
             eval_sample_weight_col = args
 
@@ -544,47 +582,53 @@ def _evaluate_mp(args):
             'sample_weight_column': fit_sample_weight_col
         }
 
-        clf = None
-        evaluations = []
-        for validation_name, (validator, is_file) in val_sets.items():
-            # validator is either a pandas dataframe, or a scikit splitter class
-            # is_file tells if it's the former. Thus:
-            if is_file:
-                # validator is a validation/test set (pd DataFrame)
-                if clf is None:
-                    kwargs = {}
-                    if fit_sample_weight_col:
-                        kwargs['sample_weight'] = trainingset[fit_sample_weight_col]
-                    clf = classifier(clf_class, clf_parameters, trainingset,
-                                     features=features,
-                                     drop_na=drop_na, inf_is_na=inf_is_na,
-                                     **kwargs)
+        base_eval_dict = {
+            'validation_set': None,
+            'cv_splitter': None,
+            'ground_truth_column': true_class_col,
+            'prediction_function': prediction_function_name,
+            'sample_weight_column': eval_sample_weight_col,
+        }
 
-                y_pred, eval = evaluate(clf, validator, true_class_col,
+        clf = None
+        if val_sets:
+            kwargs = {}
+            clf = classifier(clf_class, clf_parameters, trainingset,
+                             features=features, drop_na=drop_na,
+                             inf_is_na=inf_is_na,
+                             sample_weight=fit_sample_weight_col or None)
+
+        evaluations = []
+        for validation_name, validator in val_sets.items():
+            eval_dict = dict(base_eval_dict)
+            eval_dict['validation_set'] = validation_name
+            # validator is a validation/test set (pd DataFrame)
+            y_pred, eval_ = evaluate(clf, validator, true_class_col,
+                                     prediction_function, evaluation_metrics,
+                                     sample_weight=eval_sample_weight_col or None,
+                                     features=features,
+                                     drop_na=drop_na, inf_is_na=inf_is_na)
+            eval_dict.update({'metric_%s' % k: v for k, v in eval_.items()})
+            evaluations.append(eval_dict)
+
+        for validation_name, validator in cv_splitters.items():
+            eval_dict = dict(base_eval_dict)
+            eval_dict['validation_set'] = tr_name
+            eval_dict['cv_splitter'] = validation_name
+            # validator is a splitter class for cross-validation:
+            y_pred, eval_ = evaluate_cv(clf_class, clf_parameters, trainingset,
+                                        validator, true_class_col,
                                         prediction_function, evaluation_metrics,
-                                        sample_weight=eval_sample_weight_col,
+                                        sample_weight_fit=fit_sample_weight_col or None,
+                                        sample_weight_eval=eval_sample_weight_col or None,
                                         features=features,
                                         drop_na=drop_na, inf_is_na=inf_is_na)
-            else:
-                # validator is a splitter class for cross-validation:
-                y_pred, eval = evaluate_cv(clf_class, clf_parameters, trainingset,
-                                           validator, true_class_col,
-                                           prediction_function, evaluation_metrics,
-                                           sample_weight_fit=fit_sample_weight_col,
-                                           sample_weight_eval=eval_sample_weight_col,
-                                           features=features,
-                                           drop_na=drop_na, inf_is_na=inf_is_na)
 
-            eval_new = {
-                'validation': validation_name,
-                'true_class_column': true_class_col,
-                'prediction_function': prediction_function_name,
-                'sample_weight_column': eval_sample_weight_col,
-                **{'metric_%s' % k: v for k, v in eval.items()}
-            }
-            evaluations.append(eval_new)
+            eval_dict.update({'metric_%s' % k: v for k, v in eval_.items()})
+            evaluations.append(eval_dict)
 
         return model, evaluations, warnings.showwarning
+
     finally:
         warnings.showwarning = oldwarn
 

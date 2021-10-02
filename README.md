@@ -162,12 +162,12 @@ input in the config file. Each column denote:
 | id            | int  | unique model id                                    |
 | clf           | str  | the classifier name                                |
 | param_`name1` | any  | the model parameters, prefixed with "param_"       |
-| ...           | ...  |                                                    |
-| param_`nameN` | any  |                                                    |
-| training_set  | str  | The training-set path         |
+| param_`name2` | any  | (see above)                                        |
+| ...           | ...  | ...                                                |
+| training_set  | str  | The training-set path                              |
 | feat_`name1`  | bool | The training-set features used by the model, prefixed with "feat_" (true means: feature used) |
-| ...           | ...  |                                                    |
-| feat_`nameN`  | bool |                                                    |
+| feat_`name2`  | bool | (see above)                                        |
+| ...           | ...  | ...                                                |
 | drop_na       | bool | If the classifier algorithm can not handle missing values (by default NaN and None) |
 | inf_is_na     | bool | Whether +-Inf are considered NA                    |
 | sample_weight_column | str  | The training set column denoting the optional sample weights to fit the model (empty: no weights) |
@@ -180,11 +180,12 @@ the values input in this config file. Each column denote:
 
 | Column               | Type | Description                                 |
 |----------------------|------|---------------------------------------------|
-| model_id             | int  | The unique model id (see table above)       |
-| validation           | str  | The validation-set path, or, in case of cross validation, the scikit-learn splitter class |
+| model_id             | int  | The unique id of the model evaluated (see table above)       |
+| validation_set       | str  | The validation set path. If it equals the model's training set path, it means that a cross validation was performed, splitting the training set by means of the object specified in the column `cv_splitter` |
+| cv_splitter          | bool | In case of cross validation, it is the path of the scikit-learn splitter used. When null (check it with `pd.isna`), then the training and validation sets are separate sets   |
 | ground_truth_column  | str  | The validation set column denoting the true labels (passed as argument `y_true` in `sklearn.metrics` functions) |
 | prediction_function  | str  | The function or classifier method used for prediction (passed as agument `y_pred`/`y_score` in `sklearn.metrics` functions) |
 | sample_weight_column | str  | The validation set column denoting the optional sample weights (empty: no weights) |
-| metric_`name1`       | any  | The evaluation metrics, prefixed with "evalmetric_") |
-| ...                  | ...  |                                             |
-| metric_`nameN`       | any  |                                             |
+| metric_`name1`       | any  | The evaluation metrics, prefixed with "metric_")     |
+| metric_`name2`       | any  | (see above)                                          |
+| ...                  | ...  | ...                                                  |

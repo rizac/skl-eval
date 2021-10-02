@@ -252,17 +252,14 @@ def evaluate_cv(clf_class, clf_parameters, training_set, cv_obj,
                 sample_weight_fit=None, sample_weight_eval=None,
                 features=None, drop_na=True, inf_is_na=True):
 
-    y_pred = np.full(np.nan, len(training_set))
+    y_pred = np.full(len(training_set), np.nan)
     if isinstance(y_true, str):
         y_true = training_set[y_true]
     for train_indices, test_indices in cv_obj.split(training_set.values, y_true):
         tr_set = training_set.iloc[train_indices, :]
-        fit_kwargs = {}
-        if sample_weight_fit is not None:
-            fit_kwargs = {'sample_weight': sample_weight_fit}
         clf = classifier(clf_class, clf_parameters, tr_set, features,
                          drop_na=drop_na, inf_is_na=inf_is_na,
-                         **fit_kwargs)
+                         sample_weight=sample_weight_fit)
         validation_set = training_set.iloc[test_indices, :]
         y_pred[test_indices] = \
             predict(clf, prediction_function, validation_set, features,
