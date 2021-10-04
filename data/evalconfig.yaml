@@ -35,8 +35,15 @@ model:
     file_path:
       - 'trainingset.hdf'
 
+    # The training set(s) column name denoting the true labels or true numeric
+    # values (argument 'y' of the classifier `fit` method). Provide the empty
+    # string, null or nothing if the classifier can be fitted without labels
+    # (e.g. `sklearn.ensemble.IsolationForest`)
+    ground_truth_column: null
+
     # The training sets column name denoting the sample weights to be used when fitting
-    # the classifier (method `fit`). Empty string, null or nothing: ignore the value
+    # the classifier (method `fit`). Provide the empty string, null or nothing to
+    # ignore sample weights
     sample_weight_column: null
 
     # Features to use. I.e. columns of all datasets (training and validation sets).
@@ -81,20 +88,25 @@ evaluation:
   # For splitter classes, provide the scikit-learn class name with optional
   # arguments, e.g.: "StratifiedKFold()", "KFold(n_splits=5)" or the full path,
   # e.g.: "sklearn.model_selection.KFold(5)". You can also provide both files and
-  # splitter classes if you want, e.g. to perform cross validation and use the
-  # validation files as test set in a single program run.
+  # splitter classes if you want, e.g. to perform in a single run cross
+  # validation and use the validation files as test set
   validation:
     - 'validationset_bad.hdf'
     - 'validationset_good.hdf'
 
   # The validation set(s) column name denoting the true labels or true numeric
-  # values. In case of cross-validation (at least one validation-set provided as
-  # splitter class, see above), this must be a column of all training sets
+  # values (argument `y_true` of scikit-learn metrics functions). In case of
+  # cross-validation (see `evaluation.validation`) it must be a column of the
+  # training set, and it is usually the same as the ground truth column used for
+  # fitting the model, if given
   ground_truth_column: 'outlier'
 
   # The validation set(s) column name denoting the sample weights to be used when
   # evaluating the model (argument `sample_weight` of scikit-learn metrics
-  # functions). Provide the empty string, null or nothing to ignores the value
+  # functions). In case of cross-validation (see `evaluation.validation`) it must
+  # be a column of the training set, and doesn't need to be the same as the sample
+  # weight column used for fitting the model, if given. Provide the empty string,
+  # null or nothing to ignore sample weights
   sample_weight_column: null
 
   # The function used by each trained model to classify or predict new instances.

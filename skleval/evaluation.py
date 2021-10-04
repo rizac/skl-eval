@@ -12,7 +12,7 @@ import math
 import sys
 import warnings
 from contextlib import contextmanager
-from math import isnan
+# from math import isnan
 
 from multiprocessing import Pool, cpu_count
 from itertools import product, combinations, chain
@@ -77,9 +77,32 @@ def _load_pyobj(py_path):
     return getattr(obj, att_name)
 
 
-def run(clf, clf_parameters, trainingset, validationset, features, ground_truth_column,
+class M:
+    """Model table columns"""
+    # (Enums are simply an overhead here)
+    TR_SET = 'training_set'
+    CLF = 'clf'
+    GROUND_TRUTH = 'ground_truth_column',
+    PARAM_PREFIX = 'param_'
+    SAMPLE_WEIGHT = 'sample_weight_column',
+    FEAT_PREFIX = 'feat_'
+    DROP_NA = 'drop_na'
+    INF_ISNA = 'inf_is_na'
+
+
+class E:
+    VAL_SET = 'validation_set'
+    CV_SPLIT = 'cv_splitter'
+    GROUND_TRUTH = 'ground_truth_column'
+    METRIC_PREFIX = 'metric_'
+    SAMPLE_WEIGHT = 'sample_weight_column'
+    PREDICT_FUNC = 'prediction_function'
+
+
+def run(clf, clf_parameters, trainingset, validationset, features,
+        tr_set_ground_truth_col, tr_set_sample_weight_col,
         drop_na, inf_is_na, prediction_function, evaluation_metrics,
-        fit_sample_weight_column=None, eval_sample_weight_column=None,
+        val_set_ground_truth_col, val_set_sample_weight_col=None,
         multi_process=True, verbose=False):
     """
     Run the evaluation from the given arguments. Yields two dicts, one with the
@@ -138,22 +161,25 @@ def run(clf, clf_parameters, trainingset, validationset, features, ground_truth_
     unique_features, feat_iterator, feat_iterations = process_features(features)
 
     # tr and val sets:
-    training_sets, validation_sets, cv_splitters = \
-        process_input_datasets(trainingset, validationset, unique_features,
-                               ground_truth_column, fit_sample_weight_column,
-                               eval_sample_weight_column)
+    tr_sets, val_sets, cv_splitters = process_input_datasets(trainingset,
+                                                             validationset,
+                                                             unique_features,
+                                                             tr_set_ground_truth_col,
+                                                             tr_set_sample_weight_col,
+                                                             val_set_ground_truth_col,
+                                                             val_set_sample_weight_col)
 
     # compute total iterations, create a function yielding the product of
     # all arguments which define the number of evaluations to be executed
-    _all_validations = len(validation_sets) + len(cv_splitters)
-    total_iters = len(training_sets) * _all_validations * feat_iterations * \
+    _all_validations = len(val_sets) + len(cv_splitters)
+    total_iters = len(tr_sets) * _all_validations * feat_iterations * \
         len(parameters)
 
     if verbose:
         print(pd.DataFrame([
             ['Reading configuration file', '', ''],
             ['==========================', '', ''],
-            ['training set(s):', str(len(training_sets)), '×'],
+            ['training set(s):', str(len(tr_sets)), '×'],
             ['parameters combination(s):', str(len(parameters)), '×'],
             ['features combination(s):', str(feat_iterations), '×'],
             ['validation set(s) / cv splitter(s):', str(_all_validations), '='],
@@ -162,32 +188,36 @@ def run(clf, clf_parameters, trainingset, validationset, features, ground_truth_
         ]).to_string(justify='right', index=False, header=False, na_rep=''))
         print()
 
-    fit_sample_weight_column = fit_sample_weight_column or ''
-    eval_sample_weight_column = eval_sample_weight_column or ''
+    # these columns might be null or empty string. If null, then pandas
+    # displays NaN, which might be misleading. Convert them to empty string:
+    tr_set_ground_truth_col = tr_set_ground_truth_col or ''
+    tr_set_sample_weight_col = tr_set_sample_weight_col or ''
+    val_set_sample_weight_col = val_set_sample_weight_col or ''
 
     # Columns with a predefined finite sets of values can be set as
     # categorical data type, saving space. Let's create the Categorical dtypes
     # once for all now, and then cast each yielded dataframe.
     # PLEASE NOTE: None and NaN are not allowed in the categories, because it
     # is reserved for missing values (e.g.: categories=[1,2], dataframe has a
-    # value=3 => the value will be None/NaN)
+    # value=3 => the value will be None/NaN):
 
     # First start with the classifier parameters
     model_categorical_columns = {
-        'training_set': categorical_dtype(training_sets.keys()),
-        'clf': categorical_dtype([clf_path]),
-        'sample_weight_column': categorical_dtype([fit_sample_weight_column]),
-        **{'param_' + p: categorical_dtype(v) for p, v in clf_parameters.items()}
+        M.TR_SET: categorical_dtype(tr_sets.keys()),
+        M.CLF: categorical_dtype([clf_path]),
+        M.GROUND_TRUTH: categorical_dtype([tr_set_ground_truth_col]),
+        M.SAMPLE_WEIGHT: categorical_dtype([tr_set_sample_weight_col]),
+        **{M.PARAM_PREFIX + p: categorical_dtype(v) for p, v in clf_parameters.items()}
     }
 
     eval_categorical_columns = {
-        'validation_set': categorical_dtype(
-            chain(validation_sets.keys(), training_sets.keys() if cv_splitters else [])
+        E.VAL_SET: categorical_dtype(
+            chain(val_sets.keys(), tr_sets.keys() if cv_splitters else [])
         ),
-        'cv_splitter': categorical_dtype(cv_splitters.keys()),
-        'ground_truth_column': categorical_dtype([ground_truth_column]),
-        'prediction_function': categorical_dtype([prediction_function_path]),
-        'sample_weight_column': categorical_dtype([eval_sample_weight_column]),
+        E.GROUND_TRUTH: categorical_dtype([val_set_ground_truth_col]),
+        E.SAMPLE_WEIGHT: categorical_dtype([val_set_sample_weight_col]),
+        E.CV_SPLIT: categorical_dtype(cv_splitters.keys()),
+        E.PREDICT_FUNC: categorical_dtype([prediction_function_path])
     }
 
     # Create the pool for multi processing (if enabled) and run the evaluations:
@@ -196,12 +226,27 @@ def run(clf, clf_parameters, trainingset, validationset, features, ground_truth_
     _map = pool.imap_unordered if pool is not None else \
         lambda function, iterable, **kwargs: map(function, iterable)
     # map arguments:
-    _args = product([clf_path], [clf_class], parameters, training_sets.items(),
+    # clf_name, clf_class, clf_parameters, (tr_name, trainingset), \
+    # tr_set_ground_truth_col, tr_set_sample_weight_col, \
+    # prediction_function, prediction_function_name, \
+    # val_sets, cv_splitters, features, unique_features, drop_na, \
+    # inf_is_na, evaluation_metrics, val_set_ground_truth_col, \
+    # val_set_sample_weight_col = args
+
+    #         clf_name, clf_class, clf_parameters, (tr_name, trainingset), \
+    #             tr_set_ground_truth_col, tr_set_sample_weight_col, \
+    #             prediction_function, prediction_function_name, \
+    #             val_sets, cv_splitters, features, unique_features, drop_na, \
+    #             inf_is_na, evaluation_metrics, val_set_ground_truth_col, \
+    #             val_set_sample_weight_col = args
+
+    _args = product([clf_path], [clf_class], parameters, tr_sets.items(),
+                    [tr_set_ground_truth_col], [tr_set_sample_weight_col],
                     [prediction_function], [prediction_function_path],
-                    [validation_sets], [cv_splitters], feat_iterator, [unique_features],
-                    [ground_truth_column], [drop_na], [inf_is_na],
-                    [evaluation_metrics], [fit_sample_weight_column],
-                    [eval_sample_weight_column])
+                    [val_sets], [cv_splitters], feat_iterator, [unique_features],
+                    [drop_na], [inf_is_na], [evaluation_metrics],
+                    [val_set_ground_truth_col], [val_set_sample_weight_col])
+
     models, evaluations, warnings = [], [], WarningContainer()
     progressbar = click.progressbar if verbose else _progressbar_mock
     with progressbar(length=total_iters, fill_char='o', empty_char='.',
@@ -393,18 +438,18 @@ def process_features(features):
 
 
 def process_input_datasets(training_set, validation_set, unique_features,
-                           ground_truth_column,
-                           tr_sample_weight_column=None,
-                           ts_sample_weight_column=None):
+                           tr_set_ground_truth_col, tr_set_sample_weight_col,
+                           val_set_ground_truth_col, val_set_sample_weight_col):
     # test sets (pandas DataFrames):
-    _cols = list(unique_features) + [ground_truth_column] + \
-        ([ts_sample_weight_column] if ts_sample_weight_column else [])
+    _cols = list(unique_features) + [val_set_ground_truth_col]
+    if val_set_sample_weight_col:
+        _cols.append(val_set_sample_weight_col)
     _paths = [validation_set] if isinstance(validation_set, str) else validation_set
     v_sets, cv_splitters = {}, {}
     for pth in _paths:
         try:
             v_sets[pth] = read_hdf(pth, mandatory_columns=_cols)
-        except Exception:
+        except Exception:  # noqa
             try:
                 mod_sel_module = _load_pyobj("sklearn.model_selection")
                 pth_ = pth.strip()
@@ -431,9 +476,11 @@ def process_input_datasets(training_set, validation_set, unique_features,
                          'scikit cross validator classes)')
 
     # training sets (pandas DataFrames):
-    _cols = list(unique_features) + \
-        ([ground_truth_column] if cv_splitters else []) + \
-        ([tr_sample_weight_column] if tr_sample_weight_column else [])
+    _cols = list(unique_features)
+    if tr_set_ground_truth_col:
+        _cols.append(tr_set_ground_truth_col)
+    if tr_set_sample_weight_col:
+        _cols.append(tr_set_sample_weight_col)
     _paths = [training_set] if isinstance(training_set, str) else training_set
     tr_sets = {f: read_hdf(f, mandatory_columns=_cols) for f in _paths}
 
@@ -560,10 +607,11 @@ def _evaluate_mp(args):
         # Note below: the variable name 'testsets' is legacy code, they are
         # actually validation sets
         clf_name, clf_class, clf_parameters, (tr_name, trainingset), \
+            tr_set_ground_truth_col, tr_set_sample_weight_col, \
             prediction_function, prediction_function_name, \
-            val_sets, cv_splitters, features, unique_features, true_class_col, drop_na, \
-            inf_is_na, evaluation_metrics, fit_sample_weight_col, \
-            eval_sample_weight_col = args
+            val_sets, cv_splitters, features, unique_features, drop_na, \
+            inf_is_na, evaluation_metrics, val_set_ground_truth_col, \
+            val_set_sample_weight_col = args
 
         # Features might be a tuple. Dataframes interpret tuples not as multi
         # selector, but as single "scalar" key. Thus convert to list. Also,
@@ -574,57 +622,66 @@ def _evaluate_mp(args):
             features = list(features)
 
         model = {
-            'clf': clf_name,
-            **{'param_%s' % k: v for k, v in clf_parameters.items()},
-            'training_set': tr_name,
-            **{'feat_%s' % f: f in features for f in unique_features},
-            'drop_na': drop_na, 'inf_is_na': inf_is_na,
-            'sample_weight_column': fit_sample_weight_col
+            M.CLF: clf_name,
+            **{M.PARAM_PREFIX + k: v for k, v in clf_parameters.items()},
+            M.TR_SET: tr_name,
+            **{M.FEAT_PREFIX + f: f in features for f in unique_features},
+            M.GROUND_TRUTH: tr_set_ground_truth_col,
+            M.SAMPLE_WEIGHT: tr_set_sample_weight_col,
+            M.DROP_NA: drop_na,
+            M.INF_ISNA: inf_is_na,
         }
 
         base_eval_dict = {
-            'validation_set': None,
-            'cv_splitter': None,
-            'ground_truth_column': true_class_col,
-            'prediction_function': prediction_function_name,
-            'sample_weight_column': eval_sample_weight_col,
+            E.VAL_SET: None,
+            E.CV_SPLIT: None,
+            E.GROUND_TRUTH: val_set_ground_truth_col,
+            E.SAMPLE_WEIGHT: val_set_sample_weight_col,
+            E.PREDICT_FUNC: prediction_function_name,
         }
+
+        # these parameters can be input as empty string to indicate None,
+        # NOTE: they MUST be returned as string in the dicts above, but need
+        # to be passed as None in the function calls below. So convert now:
+        tr_set_ground_truth_col = tr_set_ground_truth_col or None
+        tr_set_sample_weight_col = tr_set_sample_weight_col or None
+        val_set_sample_weight_col = val_set_sample_weight_col or None
 
         clf = None
         if val_sets:
-            kwargs = {}
             clf = classifier(clf_class, clf_parameters, trainingset,
                              features=features, drop_na=drop_na,
                              inf_is_na=inf_is_na,
-                             sample_weight=fit_sample_weight_col or None)
+                             ground_truth=tr_set_ground_truth_col,
+                             sample_weight=tr_set_sample_weight_col)
 
         evaluations = []
         for validation_name, validator in val_sets.items():
             eval_dict = dict(base_eval_dict)
-            eval_dict['validation_set'] = validation_name
+            eval_dict[E.VAL_SET] = validation_name
             # validator is a validation/test set (pd DataFrame)
-            y_pred, eval_ = evaluate(clf, validator, true_class_col,
+            y_pred, eval_ = evaluate(clf, validator, val_set_ground_truth_col,
                                      prediction_function, evaluation_metrics,
-                                     sample_weight=eval_sample_weight_col or None,
+                                     sample_weight=val_set_sample_weight_col,
                                      features=features,
                                      drop_na=drop_na, inf_is_na=inf_is_na)
-            eval_dict.update({'metric_%s' % k: v for k, v in eval_.items()})
+            eval_dict.update({E.METRIC_PREFIX + k: v for k, v in eval_.items()})
             evaluations.append(eval_dict)
 
         for validation_name, validator in cv_splitters.items():
             eval_dict = dict(base_eval_dict)
-            eval_dict['validation_set'] = tr_name
-            eval_dict['cv_splitter'] = validation_name
+            eval_dict[E.VAL_SET] = tr_name
+            eval_dict[E.CV_SPLIT] = validation_name
             # validator is a splitter class for cross-validation:
             y_pred, eval_ = evaluate_cv(clf_class, clf_parameters, trainingset,
-                                        validator, true_class_col,
+                                        validator, val_set_ground_truth_col,
                                         prediction_function, evaluation_metrics,
-                                        sample_weight_fit=fit_sample_weight_col or None,
-                                        sample_weight_eval=eval_sample_weight_col or None,
+                                        sample_weight_fit=tr_set_sample_weight_col,
+                                        sample_weight_eval=val_set_sample_weight_col,
                                         features=features,
                                         drop_na=drop_na, inf_is_na=inf_is_na)
 
-            eval_dict.update({'metric_%s' % k: v for k, v in eval_.items()})
+            eval_dict.update({E.METRIC_PREFIX + k: v for k, v in eval_.items()})
             evaluations.append(eval_dict)
 
         return model, evaluations, warnings.showwarning
@@ -675,26 +732,3 @@ class WarningContainer(dict if sys.version_info[:2] >= (3, 6) else
 
         self[str(message)] = warnings.formatwarning(message, category,
                                                     filename, lineno)
-
-
-# def save_df(dataframe, filepath, **kwargs):
-#     """Wrapper around `dataframe.to_hdf`.
-#     Save the given dataframe as HDF file under `filepath`.
-#
-#     :param kwargs: additional arguments to be passed to pandas `to_hdf`,
-#         EXCEPT 'format' and 'mode' that are set inside this function
-#     """
-#     if 'key' not in kwargs:
-#         key = splitext(basename(filepath))[0]
-#         if not re.match('^[a-zA-Z_][a-zA-Z0-9_]*$', key):
-#             raise ValueError('Invalid file basename. '
-#                              'Change the name or provide a `key` argument '
-#                              'to the save_df function or change file name')
-#         kwargs['key'] = key
-#     kwargs.setdefault('append', False)
-#     dataframe.to_hdf(
-#         filepath,
-#         format='table',
-#         mode='w' if not kwargs['append'] else 'a',
-#         **kwargs
-#     )

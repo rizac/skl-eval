@@ -31,7 +31,7 @@ def isna(dataframe, features=None, inf_is_na=False):
 
 
 def classifier(clf_class, clf_parameters, training_set, features=None,
-               drop_na=True, inf_is_na=True, **fit_kwargs):
+               ground_truth=None, drop_na=True, inf_is_na=True, **fit_kwargs):
     """
     Return a scikit-learn model fitted with the data of `trainingset`.
     See :func:`save_clf` and :func:`load_clf` for serializing the created
@@ -46,6 +46,11 @@ def classifier(clf_class, clf_parameters, training_set, features=None,
         with. It must be a list of columns of the training and test sets.
         If None (the default), all columns will be used. If string, it denotes
         the only column to be used
+    :param ground_truth: string or array or None. The true class labels/values
+        (argument `y` of the classifier `fit` method). If string, it must be a
+        column of the training set. Note that some classifiers (e.g.
+        `sklearn.ensemble.IsolationForest`) do not require this argument: in
+        that case, None can be passed
     :param drop_na: boolean. Drop instances from the training set that have
         any NA/missing value, before fitting the classifier. NA values are
         either NaN or None (and optionally +-Inf, see `inf_is_na`).
@@ -57,14 +62,23 @@ def classifier(clf_class, clf_parameters, training_set, features=None,
     :return: a fitted classifier object
     """
     clf = clf_class(**clf_parameters)
+
+    y = ground_truth
+    if isinstance(ground_truth, str):
+        y = training_set[ground_truth].values
+        if features is None:
+            features = [f for f in training_set.columns if f != ground_truth]
+
     tr_set = training_set
     if features is not None:
         if isinstance(features, str):
             features = [features]
         tr_set = training_set[features]
+
     if drop_na:
         tr_set = dropna(tr_set, inf_is_na=inf_is_na)
-    clf.fit(tr_set.values.copy(), **fit_kwargs)
+
+    clf.fit(tr_set.values.copy(), y, **fit_kwargs)
     return clf
 
 
@@ -251,15 +265,16 @@ def evaluate_cv(clf_class, clf_parameters, training_set, cv_obj,
                 y_true, prediction_function, evaluation_metrics,
                 sample_weight_fit=None, sample_weight_eval=None,
                 features=None, drop_na=True, inf_is_na=True):
-
+    # (y_true either numpy array or string)
     y_pred = np.full(len(training_set), np.nan)
     if isinstance(y_true, str):
-        y_true = training_set[y_true]
+        y_true = training_set[y_true].values
     for train_indices, test_indices in cv_obj.split(training_set.values, y_true):
         tr_set = training_set.iloc[train_indices, :]
+        ground_truth = y_true[train_indices]
         clf = classifier(clf_class, clf_parameters, tr_set, features,
-                         drop_na=drop_na, inf_is_na=inf_is_na,
-                         sample_weight=sample_weight_fit)
+                         ground_truth=ground_truth, drop_na=drop_na,
+                         inf_is_na=inf_is_na, sample_weight=sample_weight_fit)
         validation_set = training_set.iloc[test_indices, :]
         y_pred[test_indices] = \
             predict(clf, prediction_function, validation_set, features,

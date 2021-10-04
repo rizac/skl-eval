@@ -107,9 +107,13 @@ class Test(unittest.TestCase):
         with self.assertRaises(KeyError) as verr:
             read_hdf(input_hdf+'::abc')
 
+        # no positional arguments allowed after the first (path or buf):
+        with self.assertRaises(TypeError) as verr:
+            read_hdf(input_hdf + '::abc', 'key')
+
         # key supplied twice:
         with self.assertRaises(ValueError) as verr:
-            read_hdf(input_hdf+'::abc', 'key')
+            read_hdf(input_hdf+'::abc', key='key')
 
         # wrong key:
         with self.assertRaises(ValueError) as verr:
@@ -150,7 +154,7 @@ class Test(unittest.TestCase):
                 # all evaluations:
                 shutil.copytree(test_data_dir, destdir, dirs_exist_ok=True)
 
-                for input_filename in ['evalconfig.yaml', 'evalconfig2.yaml']:
+                for input_filename in ['evalconfig2.yaml', 'evalconfig.yaml']:
                     inputconfig = os.path.join(destdir, input_filename)
                     destfile = os.path.join(destdir, input_filename + '.hdf')
                     runner = CliRunner()
@@ -176,29 +180,31 @@ class Test(unittest.TestCase):
                     tsset_count = 1 if isinstance(_tsset, str) else len(_tsset)
                     total_rows = len(models_df) * tsset_count
                     self.assertEqual(len(eval_df), total_rows)
-                    for _, dfr in eval_df.groupby('model_id'):
+
+                    # there are two rows in `dfr`, one relative to a "good" testset,
+                    # where data has the "correct" label, and a "bad" testset, where
+                    # the labels have been switched on purpose:
+                    if input_filename == 'evalconfig.yaml':
+                        for _, dfr in eval_df.groupby('model_id'):
+                            validations = dfr.validation_set
+
+                            series_good = dfr.loc[validations.str.contains('_good')]
+                            expected_series = 1
+                            self.assertEqual(len(series_good), expected_series)
+                            series_bad = dfr.loc[validations.str.contains('_bad')]
+                            self.assertEqual(len(series_bad), expected_series)
+                            evm = 'metric_average_precision_score'
+                            self.assertTrue(series_good[evm].min() > series_bad[evm].max())
+                    elif input_filename == 'evalconfig2.yaml':
+                        dfr = eval_df
                         validations = dfr.validation_set
-                        # there are two rows in `dfr`, one relative to a "good" testset,
-                        # where data has the "correct" label, and a "bad" testset, where
-                        # the labels have been switched on purpose:
                         series_good = dfr.loc[validations.str.contains('_good')]
-                        self.assertTrue(len(series_good) == 1)
-                        series_good = series_good.iloc[0]
+                        expected_series = 6
+                        self.assertEqual(len(series_good), expected_series)
                         series_bad = dfr.loc[validations.str.contains('_bad')]
-                        self.assertTrue(len(series_bad) == 1)
-                        series_bad = series_bad.iloc[0]
-                        # evm: the higher, the better, evm_loss: the lower, the better
-                        prefix = 'metric_'
-                        evm = [(prefix + _) for _ in
-                                    ['average_precision_score',
-                                     'pr_curve_best_threshold_f1score']]
-                        evm = [c for c in dfr.columns if c in [prefix + 'average_precision_score',
-                                                               prefix + 'pr_curve_best_threshold_f1score']]
-                        evm_loss = [c for c in dfr.columns if '_error' in c or '_loss' in c]
-                        # check evaluation values are consistent in the two testsets
-                        # (good vs bad):
-                        self.assertTrue((series_good[evm] > series_bad[evm]).all())
-                        self.assertTrue((series_good[evm_loss] < series_bad[evm_loss]).all())
+                        self.assertEqual(len(series_bad), expected_series)
+                        evm = 'metric_average_precision_score'
+                        # self.assertTrue(series_good[evm].min() > series_bad[evm].max())
 
             # open the file and check
         finally:
