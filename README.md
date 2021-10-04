@@ -1,9 +1,8 @@
 # skl-eval
 
-Program to run iteratively scikit-learn evaluations from pre-built
-training and validation set(s): implement your own features, parameters 
-and evaluation metrics in a configuration file, and let the program run 
-iteratively any given combination of them. 
+Program to run full-scale evaluation in scikit-learn (hyperparameters 
+optimization, features selection, metric scores computation) from
+a single configuration file
 
 ```console
 $ skl-eval -c ./path/to/my-config.yaml /path/to/my-evaluation-result.hdf
@@ -23,17 +22,20 @@ Computing  [oooooooooooooooooooooooooooo........]   80%  04:43:12
 
 This program assumes that you are already familiar with the
 [scikit-learn evaluation routines](https://scikit-learn.org/stable/modules/model_evaluation.html),
-and offers an alternative solution in those cases when:
+and offers an alternative solution in specific cases, e.g.:
 
  1. A standard cross validation is not sufficient and thus
-    separate training and validation set(s) are pre-built and available
+    separate training and validation set(s) are pre-built and available, and
+    you want to perform several analysis, e.g, both hyperparameter optimization 
+    and features selection at once
  2. You want to avoid the burden of implementing your own code, focusing on the
     configuration of your parameters, letting the program build all features 
     and parameters combinations with a single command while showing 
     progress bar and estimated time available on the terminal
  3. You want to save your evaluations in a portable and simple tabular format
     (HDF file) whose structure is described at the bottom of the page
-    and can be loaded in your Python code for analysis via `pandas.read_hdf`
+    and that you can analyze easily by loading it in your Python code via
+    `pandas.read_hdf`
     
 
 ## Installation
@@ -109,7 +111,7 @@ parameters, features and metrics to calculate
 #### (Optional) Configure custom prediction functions and evaluation metrics
  
 By default, scikit-learn models implement their decision / prediction
-functions via class methods (e.g. `predict`, `decision_function`), and
+functions via class methods (e.g. [predict, decision_function](https://scikit-learn.org/stable/glossary.html#methods)), and
 the package offers all necessary [evaluation metrics](https://scikit-learn.org/stable/modules/model_evaluation.html). 
 The prediction function and evaluation metric(s) are customizable 
 by simply typing their Python path in the configuration file
@@ -159,18 +161,19 @@ input in the config file. Each column denote:
 
 | Column        | Type | Description                                        |
 |---------------|------|----------------------------------------------------|
-| id            | int  | unique model id                                    |
-| clf           | str  | the classifier name                                |
-| param_`name1` | any  | the model parameters, prefixed with "param_"       |
+| id            | int  | Unique model id                                    |
+| clf           | str  | Python path of the scikit-learn classifier used    |
+| param_`name1` | any  | classifier parameters, prefixed with "param_"      |
 | param_`name2` | any  | (see above)                                        |
 | ...           | ...  | ...                                                |
 | training_set  | str  | The training-set path                              |
 | feat_`name1`  | bool | The training-set features used by the model, prefixed with "feat_" (true means: feature used) |
 | feat_`name2`  | bool | (see above)                                        |
 | ...           | ...  | ...                                                |
-| drop_na       | bool | If the classifier algorithm can not handle missing values (by default NaN and None) |
-| inf_is_na     | bool | Whether +-Inf are considered NA                    |
+| ground_truth_column | str  | The training set column denoting the true labels/numeric values used to fit the model (can be null if the classifier `fit` method needs no labels) |
 | sample_weight_column | str  | The training set column denoting the optional sample weights to fit the model (empty: no weights) |
+| drop_na       | bool | Remove values not avaliable (NA) from the training set. True if the classifier cannot handle NA values (by default NaN and None) |
+| inf_is_na     | bool | Whether +-Inf should also be considered NA                    |
 
 
 **Table "evaluations"**
@@ -181,11 +184,11 @@ the values input in this config file. Each column denote:
 | Column               | Type | Description                                 |
 |----------------------|------|---------------------------------------------|
 | model_id             | int  | The unique id of the model evaluated (see table above)       |
-| validation_set       | str  | The validation set path. If it equals the model's training set path, it means that a cross validation was performed, splitting the training set by means of the object specified in the column `cv_splitter` |
-| cv_splitter          | bool | In case of cross validation, it is the path of the scikit-learn splitter used. When null (check it with `pd.isna`), then the training and validation sets are separate sets   |
+| validation_set       | str  | The validation set path. If this equals the model's training set path, then a cross validation was performed, splitting the training set by means of the object specified in the column `cv_splitter` |
+| cv_splitter          | bool | In case of cross validation, it is the path of the scikit-learn splitter used. When null (check it with `pd.isna`), then the `validation_set` is provided as file and most likely distinct from the training set |
 | ground_truth_column  | str  | The validation set column denoting the true labels (passed as argument `y_true` in `sklearn.metrics` functions) |
-| prediction_function  | str  | The function or classifier method used for prediction (passed as agument `y_pred`/`y_score` in `sklearn.metrics` functions) |
 | sample_weight_column | str  | The validation set column denoting the optional sample weights (empty: no weights) |
+| prediction_function  | str  | The function or classifier method used for prediction (passed as agument `y_pred`/`y_score` in `sklearn.metrics` functions) |
 | metric_`name1`       | any  | The evaluation metrics, prefixed with "metric_")     |
 | metric_`name2`       | any  | (see above)                                          |
 | ...                  | ...  | ...                                                  |

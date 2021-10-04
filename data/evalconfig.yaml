@@ -111,11 +111,12 @@ evaluation:
 
   # The function used by each trained model to classify or predict new instances.
   # Usually, it is the full path or simply the name of a classifier method (e.g.
-  # "decision_function", "predict", "sklearn.ensemble.IsolationForest.predict"),
-  # but it can also be the path to any user-defined function with signature
-  # `(clf, X)` where `clf` is the classifier object and `X` is the data matrix
-  # to be classified or predicted. In any case, be sure that the output of this
-  # function is consistent with the values provided in the ground truth column.
+  # "decision_function", "sklearn.ensemble.IsolationForest.predict". For details
+  # see https://scikit-learn.org/stable/glossary.html#methods), but it can also
+  # be the path to any user-defined function with signature `(clf, X)` where `clf`
+  # is the classifier object and `X` is the data matrix to be classified or predicted
+  # In any case, be sure that the output of this function is consistent with the
+  # values provided in the ground truth column.
   # E.g., if ground truth labels are either True or False, a prediction function
   # can return continuous scores in [0, 1], or binary labels in {0, 1}, but not
   # scores in [0, +Inf] or labels in {-1, 1}
@@ -136,7 +137,7 @@ evaluation:
 
 
 # Evaluation output file description
-#
+
 # The evaluation result file produced by the program by means of the
 # configuration file is an HDF file composed by 2 linked HDF tables. In Python,
 # you can open the tables via the `pandas` library:
@@ -154,17 +155,19 @@ evaluation:
 #
 # | Column        | Type | Description                                        |
 # |---------------|------|----------------------------------------------------|
-# | id            | int  | unique model id                                    |
-# | clf           | str  | the classifier name                                |
-# | param_`name1` | any  | the model parameters, prefixed with "param_"       |
-# | ...           | ...  |                                                    |
-# | param_`nameN` | any  |                                                    |
+# | id            | int  | Unique model id                                    |
+# | clf           | str  | Python path of the scikit-learn classifier used    |
+# | param_`name1` | any  | classifier parameters, prefixed with "param_"      |
+# | param_`name2` | any  | (see above)                                        |
+# | ...           | ...  | ...                                                |
 # | training_set  | str  | The training-set path                              |
 # | feat_`name1`  | bool | The training-set features used by the model, prefixed with "feat_" (true means: feature used) |
-# | ...           | ...  |                                                    |
-# | feat_`nameN`  | bool |                                                    |
-# | drop_na       | bool | If the classifier algorithm can not handle missing values (by default NaN and None) |
-# | inf_is_na     | bool | Whether +-Inf are considered NA                    |
+# | feat_`name2`  | bool | (see above)                                        |
+# | ...           | ...  | ...                                                |
+# | ground_truth_column | str  | The training set column denoting the true labels/numeric values used to fit the model (can be null if the classifier `fit` method needs no labels) |
+# | sample_weight_column | str  | The training set column denoting the optional sample weights to fit the model (empty: no weights) |
+# | drop_na       | bool | Remove values not avaliable (NA) from the training set. True if the classifier cannot handle NA values (by default NaN and None) |
+# | inf_is_na     | bool | Whether +-Inf should also be considered NA                    |
 #
 #
 # **Table "evaluations"**
@@ -174,12 +177,13 @@ evaluation:
 #
 # | Column               | Type | Description                                 |
 # |----------------------|------|---------------------------------------------|
-# | model_id             | int  | The unique model id (see table above)       |
-# | test_set             | str  | The test set path                           |
-# | cross_validation     | str  | Cross-valid. class (Python path), if present|
+# | model_id             | int  | The unique id of the model evaluated (see table above)       |
+# | validation_set       | str  | The validation set path. If this equals the model's training set path, then a cross validation was performed, splitting the training set by means of the object specified in the column `cv_splitter` |
+# | cv_splitter          | bool | In case of cross validation, it is the path of the scikit-learn splitter used. When null (check it with `pd.isna`), then the `validation_set` is provided as file and most likely distinct from the training set |
 # | ground_truth_column  | str  | The validation set column denoting the true labels (passed as argument `y_true` in `sklearn.metrics` functions) |
-# | sample_weight_column  | str  | The validation set column denoting the true labels (passed as argument `y_true` in `sklearn.metrics` functions) |
-# | prediction_function  | str  | the function or classifier method used for prediction (passed as agument `y_pred`/`y_score` in `sklearn.metrics` functions) |
-# | evalmetric_`name1`   | any  | The evaluation metrics, prefixed with "evalmetric_") |
-# | ...                  | ...  |                                             |
-# | evalmetric_`nameN`   | any  |                                             |
+# | sample_weight_column | str  | The validation set column denoting the optional sample weights (empty: no weights) |
+# | prediction_function  | str  | The function or classifier method used for prediction (passed as agument `y_pred`/`y_score` in `sklearn.metrics` functions) |
+# | metric_`name1`       | any  | The evaluation metrics, prefixed with "metric_")     |
+# | metric_`name2`       | any  | (see above)                                          |
+# | ...                  | ...  | ...                                                  |
+#
