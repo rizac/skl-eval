@@ -100,7 +100,7 @@ class Test(unittest.TestCase):
         # test by providing additional coplumns not existing ('bla'):
         pd.testing.assert_frame_equal(read_hdf(input_hdf),
                                       read_hdf(input_hdf, columns=['PGA', 'PGV',
-                                                                   'outlier', 'bla']))
+                                                                   'label', 'bla']))
         # test errors
 
         # wrong key:
@@ -199,12 +199,12 @@ class Test(unittest.TestCase):
                         dfr = eval_df
                         validations = dfr.validation_set
                         series_good = dfr.loc[validations.str.contains('_good')]
-                        expected_series = 6
+                        expected_series = 3
                         self.assertEqual(len(series_good), expected_series)
                         series_bad = dfr.loc[validations.str.contains('_bad')]
                         self.assertEqual(len(series_bad), expected_series)
                         evm = 'metric_average_precision_score'
-                        # self.assertTrue(series_good[evm].min() > series_bad[evm].max())
+                        self.assertTrue(series_good[evm].min() > series_bad[evm].max())
 
             # open the file and check
         finally:

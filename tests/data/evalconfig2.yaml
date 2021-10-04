@@ -4,22 +4,23 @@ model:
 
   parameters:
     n_estimators:
-      - 25
+      - 5
       # - 50
 
   training_set:
 
     file_path:
-      - 'testset_good.nona.hdf'
-      - 'testset_bad.nona.hdf'
+      - 'testset_good.nona.hdf::segments'
+      - 'testset_bad.nona.hdf::segments'
 
     sample_weight_column: null
 
-    ground_truth_column: outlier
+    ground_truth_column: 'label'
 
     features:
-      - PGA
-      - PGV
+      -
+        - PGA
+        - PGV
 
     drop_na: false
 
@@ -31,8 +32,9 @@ evaluation:
   validation:
     - "StratifiedKFold()"
     - "KFold(n_splits=5)"
+    - "LeaveOneOut"
 
-  ground_truth_column: 'outlier'
+  ground_truth_column: 'label'
 
   sample_weight_column: null
 
