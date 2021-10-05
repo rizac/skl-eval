@@ -1,11 +1,13 @@
 # ============================================================================
-# Evaluation configuration file. Pass its path to the program (option '-c') to
-# produce the desired evaluation in form of a HDF file whose structure (similar
-# to this config structure), is described at the bottom of this page
+# Evaluation configuration file in YAML syntax (https://quickref.me/yaml).
+# Executing the program with option `-c [this_file_path]` will produces a HDF 
+# file with all given metrics computed for any combination of given data sets, 
+# features and parameters. The HDF structure is composed of two tabls reflecting
+# this file structure and it's described at the bottom of this page
 # ============================================================================
 
 
-# Model: classifier algorithm and parameters + training set
+# Model: a classifier algorithm with parameters and fitted with a given training set
 model:
   # The Python path of the scikit-learn classifier:
   classifier: "sklearn.ensemble.IsolationForest"
@@ -36,17 +38,17 @@ model:
       - 'trainingset.hdf'
 
     # The training set(s) column name denoting the true labels or true numeric
-    # values (argument 'y' of the classifier `fit` method). Provide the empty
+    # values (argument `y` of the classifier `fit` method). Provide the empty
     # string, null or nothing if the classifier can be fitted without labels
     # (e.g. `sklearn.ensemble.IsolationForest`)
     ground_truth_column: null
 
     # The training sets column name denoting the sample weights to be used when fitting
-    # the classifier (method `fit`). Provide the empty string, null or nothing to
-    # ignore sample weights
+    # (argument `sample_weight` of the classifier `fit` method). Provide the empty 
+    # string, null or nothing to ignore sample weights
     sample_weight_column: null
 
-    # Features to use. I.e. columns of all datasets (training and validation sets).
+    # Features to use. I.e. columns of all tables (training and validation sets).
     # When providing features as list of strings, the evaluation will be performed
     # on all combinations automatically. So for example:
     # features:
@@ -89,7 +91,7 @@ evaluation:
   # arguments, e.g.: "StratifiedKFold()", "KFold(n_splits=5)" or the full path,
   # e.g.: "sklearn.model_selection.KFold(5)". You can also provide both files and
   # splitter classes if you want, e.g. to perform in a single run cross
-  # validation and use the validation files as test set
+  # validation, and use the files as test set
   validation:
     - 'validationset_bad.hdf'
     - 'validationset_good.hdf'
@@ -114,12 +116,10 @@ evaluation:
   # "decision_function", "sklearn.ensemble.IsolationForest.predict". For details
   # see https://scikit-learn.org/stable/glossary.html#methods), but it can also
   # be the path to any user-defined function with signature `(clf, X)` where `clf`
-  # is the classifier object and `X` is the data matrix to be classified or predicted
+  # is the classifier object and `X` is the data matrix to be classified or predicted.
   # In any case, be sure that the output of this function is consistent with the
-  # values provided in the ground truth column.
-  # E.g., if ground truth labels are either True or False, a prediction function
-  # can return continuous scores in [0, 1], or binary labels in {0, 1}, but not
-  # scores in [0, +Inf] or labels in {-1, 1}
+  # values provided in the ground truth column (see the documentation of the evaluation
+  # metrics used in case of doubt)
   prediction_function: 'evalutilities.isf_anomaly_score'  # <- see associated Python file
 
   # Evaluation metrics, as list of Python function paths. You can type standard
