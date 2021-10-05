@@ -1,8 +1,8 @@
 # skl-eval
 
 Program to run full-scale evaluation in scikit-learn (hyperparameters 
-optimization, features selection, metric scores computation) from
-a single configuration file
+optimization, features selection and metric scores computation)
+from a single configuration file
 
 ```console
 $ skl-eval -c ./path/to/my-config.yaml /path/to/my-evaluation-result.hdf
@@ -20,22 +20,19 @@ Computing  [oooooooooooooooooooooooooooo........]   80%  04:43:12
 <sup>excerpt of the terminal during evaluation</sup>
 <hr>
 
-This program assumes that you are already familiar with the
-[scikit-learn evaluation routines](https://scikit-learn.org/stable/modules/model_evaluation.html),
-and offers an alternative solution in specific cases, e.g.:
+    
+This program is a simple wrapper on top of the usual 
+[scikit-learn evaluation routines](https://scikit-learn.org/stable/modules/model_evaluation.html)
+with the following feaures:
 
- 1. A standard cross validation is not sufficient and thus
-    separate training and validation set(s) are pre-built and available, and
-    you want to perform several analysis, e.g, both hyperparameter optimization 
-    and features selection at once
- 2. You want to avoid the burden of implementing your own code, focusing on the
-    configuration of your parameters, letting the program build all features 
-    and parameters combinations with a single command while showing 
-    progress bar and estimated time available on the terminal
- 3. You want to save your evaluations in a portable and simple tabular format
-    (HDF file) whose structure is described at the bottom of the page
-    and that you can analyze easily by loading it in your Python code via
-    `pandas.read_hdf`
+ 1. Simple evaluation setup via a configuration file. Instead of implementing 
+    your own code, input the classifier algorithm, parameters, features and 
+    evaluation metrics, and let the program build all of their combinations 
+    while showing progress bar and estimated time available on the terminal
+ 3. Portable and simple output showing evaluation results in tabular format
+    (HDF file). The output structure is described at the bottom of the page
+    and can be loaded it in your Python code via `pandas.read_hdf` to
+    analyzed the evaluation results
     
 
 ## Installation
@@ -64,45 +61,39 @@ Notes:
 
 ## Usage
 
-### Prepare your datasets
-
-The datasets can be created as `DataFrame` objects with the `pandas` library
-(installed with the  program) and then saved as HDF via the `DataFrame.to_hdf`
-method. To run the program you need:
-
-- One or more training set, with features arranged by column(s), and 
-  instances arranged by rows
-- One or more validation sets, with the same features as the training set(s), 
-  and an additional "ground truth" column with the real values, e.g. class 
-  labels,  numeric scores. The ground truth column can have any name. 
-  Note that if a column named 'sample_weight' is present, it will be used in 
-  the `sample_weight` argument of most [evaluation
+<!-- [evaluation
   metrics](https://scikit-learn.org/stable/modules/model_evaluation.html)
-  
+ -->
 
 ### Configure the evaluation
 
 If you don't have one already, create the example configuration file in YAML 
-format:
+format (`config_file`). You can get the file [here (click on "Raw" to download it](https://github.com/rizac/skl-eval/blob/main/data/evalconfig.yaml) 
+or copy it in a specific directory of your choice with the command:
 
 ```console
 skl-eval-init <output_directory>
 ```
-creates the file `<output_directory>/evalconfig.yaml` which contains all
-documentation needed and can thus be renamed and/or edited to configure your 
-evaluation:
+the `config_file` contains all documentation needed in order to be modified and configure 
+your evaluation
 
 #### Setup dataset paths
 
-By default, in the created config the training set and test set paths
-refer to three example datasets also provided in `<output_directory>`.
-The first thing to do then is to replace those paths with the paths of your 
-datasets
+By default, in the `config_file` the paths of the datasets (training set and 
+validation set) refer to three example datasets also copied in `<output_directory>` 
+with `skl-eval-init`. The first thing to do then is to replace those paths with
+the paths of your datasets.
 
+The datasets preparation is a common and very important step in any machine
+learning application and cannot be automatized, so it depends on the user needs.
+Datasets must be saved as HDF files in table format and can be manipulated
+from within Python with the `pandas` library, installed with the program.
+Please consult the `config_file` for further details on how they should
+be composed
 
 #### Setup parameters and features
 
-You can configure the classifier type, its parameters,
+You can then configure the classifier type, its parameters,
 the features to be used, and the evaluation metrics to compute. 
 The program will then take care of building all combinations of 
 parameters, features and metrics to calculate
@@ -114,17 +105,13 @@ By default, scikit-learn models implement their decision / prediction
 functions via class methods (e.g. [predict, decision_function](https://scikit-learn.org/stable/glossary.html#methods)), and
 the package offers all necessary [evaluation metrics](https://scikit-learn.org/stable/modules/model_evaluation.html). 
 The prediction function and evaluation metric(s) are customizable 
-by simply typing their Python path in the configuration file
+by simply typing their Python path in the `config_file`
 (e.g. "sklearn.metrics.log_loss")
 
 You can also define your own prediction function and evaluation metrics in a
 separate Python module, as long as the module is placed in the same directory 
-of the configuration file, and then simply type their paths
-in the evaluation config.
-
-The example configuration file by default employs user-defined functions
-implemented in a separate Python module. Both files provide all the necessary
-documentation in case of help
+of the `config_file`. The default `config_file` uses an external, fully-documented
+Python module (also copied with `skl-eval-init`) that can be inspected
 
 
 ### Run the evaluation
@@ -138,7 +125,7 @@ skl-eval -c <config_file> <output_hdf_file>
 
 ## Evaluation output file description
 
-(this section is available also at the bottom of the configuration file)
+(this section is available also at the bottom of the `config_file`)
 
 <!-- DEVELOPERS NOTE: when modifying the Evaluation output file description,
 it is recommended to modify it here and then copy/paste this section at the
