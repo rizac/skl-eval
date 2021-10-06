@@ -2,7 +2,7 @@
 # Evaluation configuration file in YAML syntax (https://quickref.me/yaml).
 # Executing the program with option `-c [this_file_path]` will produces a HDF 
 # file with all given metrics computed for any combination of given data sets, 
-# features and parameters. The HDF structure is composed of two tabls reflecting
+# features and parameters. The HDF structure is composed of two tables reflecting
 # this file structure and it's described at the bottom of this page
 # ============================================================================
 
